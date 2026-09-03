@@ -1,0 +1,157 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id            String          @id @default(cuid())
+  name          String
+  email         String          @unique
+  password_hash String
+  role          String          @default("STUDENT") // STUDENT, LECTURER, HOD, SUPERADMIN
+  is_active     Boolean         @default(true)
+  created_at    DateTime        @default(now())
+  updated_at    DateTime        @updatedAt
+
+  student_profile StudentProfile?
+  courses_taught  Course[]        @relation("LecturerCourses")
+  sessions_opened Session[]       @relation("OpenedSessions")
+  excuses_reviewed ExcuseRequest[] @relation("ReviewedExcuses")
+}
+
+model StudentProfile {
+  id            String          @id @default(cuid())
+  user_id       String?         @unique
+  user          User?           @relation(fields: [user_id], references: [id], onDelete: SetNull)
+  full_name     String
+  matric_number String          @unique
+  level         String          @default("100L") // 100L, 200L, 300L, 400L, 500L
+  email         String?
+  created_at    DateTime        @default(now())
+
+  enrollments   Enrollment[]
+  attendance    AttendanceRecord[]
+  excuses       ExcuseRequest[]
+}
+
+model Course {
+  id           String          @id @default(cuid())
+  course_code  String          @unique
+  course_title String
+  units        Int             @default(3)
+  level        String          @default("100L")
+  lecturer_id  String?
+  lecturer     User?           @relation("LecturerCourses", fields: [lecturer_id], references: [id], onDelete: SetNull)
+  created_at   DateTime        @default(now())
+
+  enrollments  Enrollment[]
+  sessions     Session[]
+}
+
+model Enrollment {
+  id               String         @id @default(cuid())
+  student_id       String
+  course_id        String
+  academic_session String         @default("2025/2026")
+  semester         String         @default("FIRST") // FIRST, SECOND
+  created_at       DateTime       @default(now())
+
+  student          StudentProfile @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  course           Course         @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([student_id, course_id])
+}
+
+model Session {
+  id                     String             @id @default(cuid())
+  course_id              String
+  course                 Course             @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  opened_by              String
+  lecturer               User               @relation("OpenedSessions", fields: [opened_by], references: [id], onDelete: Cascade)
+  opened_at              DateTime           @default(now())
+  closed_at              DateTime?
+  duration_minutes       Int                @default(60)
+  late_threshold_minutes Int                @default(15)
+  qr_token               String
+  require_qr             Boolean            @default(false)
+  require_geo            Boolean            @default(false)
+  status                 String             @default("OPEN") // OPEN, CLOSED
+  created_at             DateTime           @default(now())
+
+  attendance_records     AttendanceRecord[]
+  excuse_requests        ExcuseRequest[]
+}
+
+model AttendanceRecord {
+  id                 String           @id @default(cuid())
+  session_id         String
+  session            Session          @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  student_id         String
+  student            StudentProfile   @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  matric_number      String
+  full_name          String
+  status             String           @default("PRESENT") // PRESENT, LATE, ABSENT, EXCUSED
+  clock_in_time      DateTime         @default(now())
+  device_fingerprint String?
+  ip_address         String?
+  attendance_token   String           // 6-character unique code
+  is_flagged         Boolean          @default(false)
+  flag_reason        String?
+  notes              String?
+
+  @@unique([session_id, matric_number])
+}
+
+model ExcuseRequest {
+  id             String        @id @default(cuid())
+  student_id     String
+  student        StudentProfile @relation(fields: [student_id], references: [id], onDelete: Cascade)
+  session_id     String
+  session        Session       @relation(fields: [session_id], references: [id], onDelete: Cascade)
+  reason         String
+  document_url   String?
+  status         String        @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewed_by    String?
+  reviewer       User?         @relation("ReviewedExcuses", fields: [reviewed_by], references: [id], onDelete: SetNull)
+  reviewed_at    DateTime?
+  reviewer_notes String?
+  created_at     DateTime      @default(now())
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actor_id    String?
+  actor_name  String
+  action      String
+  entity_type String
+  entity_id   String?
+  old_value   String?  // JSON string
+  new_value   String?  // JSON string
+  timestamp   DateTime @default(now())
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  updated_at  DateTime @updatedAt
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  user_id    String
+  title      String
+  message    String
+  type       String   @default("INFO") // INFO, WARNING, SUCCESS, DANGER
+  read       Boolean  @default(false)
+  created_at DateTime @default(now())
+}
