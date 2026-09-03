@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
-  Sparkles,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -39,38 +38,32 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Login failed. Please check your Supabase credentials.");
+        setError(data.error || "Invalid email or password.");
         setLoading(false);
         return;
       }
 
-      setSuccessMsg(`Welcome, ${data.user.name || "Administrator"}! Redirecting to Admin Console...`);
+      setSuccessMsg(`Welcome! Redirecting...`);
       setTimeout(() => {
         router.push("/admin");
-      }, 800);
+      }, 600);
     } catch {
       setError("Network error occurred. Please check your connection.");
       setLoading(false);
     }
   };
 
-  const setDemoCredentials = (roleEmail: string) => {
-    setEmail(roleEmail);
-    setPassword("Password@123");
-    setError(null);
-  };
-
   return (
     <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
       <div className="max-w-md w-full space-y-6">
         {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-100 text-fuoye-green text-xs font-bold shadow-sm">
-            <ShieldCheck className="w-4 h-4 text-fuoye-green" />
-            <span>Administrator Access</span>
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-fuoye-green text-xs font-bold shadow-sm">
+            <ShieldCheck className="w-3.5 h-3.5 text-fuoye-green" />
+            <span>Admin</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Sign In to Console
+            Login
           </h1>
           <p className="text-xs text-slate-500">
             Federal University Oye-Ekiti • Department of Computer Science
@@ -96,12 +89,12 @@ export default function LoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Supabase Auth Email
+                Email
               </label>
               <div className="relative">
                 <input
                   type="email"
-                  placeholder="e.g. your-email@domain.com or admin@fuoye.edu.ng"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -119,7 +112,7 @@ export default function LoginPage() {
               <div className="relative">
                 <input
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -137,51 +130,16 @@ export default function LoginPage() {
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Authenticating with Supabase...</span>
+                  <span>Logging in...</span>
                 </>
               ) : (
                 <>
-                  <span>Sign In with Supabase</span>
+                  <span>Login</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
           </form>
-
-          {/* Verification Badge */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2 text-[11px] text-slate-400 font-medium">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>Connected directly to Supabase Auth Cloud</span>
-          </div>
-
-          {/* Quick Demo Pre-fills */}
-          <div className="space-y-2 pt-2 border-t border-slate-100">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-              Quick 1-Click Testing Accounts
-            </span>
-            <div className="grid grid-cols-2 gap-2 text-[11px]">
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("admin@fuoye.edu.ng")}
-                className="p-2.5 rounded-xl border border-purple-200 text-slate-700 bg-purple-50/70 hover:bg-purple-100 transition-colors text-left"
-              >
-                <span className="font-bold block text-purple-950">Engr. Fashola</span>
-                <span className="text-[10px] text-purple-700 font-semibold">Super Admin</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setDemoCredentials("balogun@fuoye.edu.ng")}
-                className="p-2.5 rounded-xl border border-slate-200 text-slate-700 bg-slate-50 hover:bg-amber-50 hover:border-amber-300 transition-colors text-left"
-              >
-                <span className="font-bold block text-slate-900">Dr. Balogun</span>
-                <span className="text-[10px] text-amber-700 font-semibold">Lecturer</span>
-              </button>
-            </div>
-            <p className="text-[10px] text-center text-slate-400">
-              Or type any email and password registered in your Supabase Auth dashboard.
-            </p>
-          </div>
         </div>
 
         {/* Return to Student Clock-In */}

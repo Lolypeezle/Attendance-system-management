@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       // 3. Fallback: Check local User table password_hash (for pre-existing seeded users)
       if (userError || !user) {
         return NextResponse.json(
-          { error: "Invalid email address or password. Please verify your Supabase credentials." },
+          { error: "Invalid email address or password." },
           { status: 401 }
         );
       }
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
 
       if (!isBcryptValid && !isDirectMatch) {
         return NextResponse.json(
-          { error: "Invalid email address or password. Please verify your Supabase credentials." },
+          { error: "Invalid email address or password." },
           { status: 401 }
         );
       }
