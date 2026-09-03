@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Download,
   Loader2,
+  KeyRound,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 
@@ -44,6 +45,14 @@ export default function AdminConsolePage() {
 
   const adminModules = [
     {
+      title: "Lecture Schedules & Secret Words",
+      desc: "Fix lecture dates and start times in Nigeria Time (WAT). Set unique secret words given to physical class attendees for clocking in.",
+      href: "/admin/sessions",
+      icon: KeyRound,
+      color: "bg-blue-100 text-blue-700",
+      badge: "Passcode & Time Control",
+    },
+    {
       title: "Student Attendance History",
       desc: "Exclusive institutional attendance ledger across all 300L courses. Search by student matric number, filter by course, and export to Excel/CSV.",
       href: "/admin/attendance",
@@ -51,6 +60,7 @@ export default function AdminConsolePage() {
       color: "bg-emerald-100 text-fuoye-green",
       badge: "Admin Exclusive",
     },
+
     {
       title: "User Management",
       desc: "Manage departmental lecturers, admins, and student credentials. Add personal logins, reset passwords, and toggle access.",

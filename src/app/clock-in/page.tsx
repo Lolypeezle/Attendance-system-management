@@ -14,6 +14,7 @@ import {
   Loader2,
   Sparkles,
   ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import { getBrowserFingerprint } from "@/lib/fingerprint";
 
@@ -40,10 +41,12 @@ function ClockInForm() {
   const [selectedCourseOrSession, setSelectedCourseOrSession] = useState<string>(urlSessionId || "crs_302");
   const [matricNumber, setMatricNumber] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
+  const [secretWord, setSecretWord] = useState<string>(urlQrToken || "");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("");
   const [location, setLocation] = useState<{ lat?: number; lng?: number } | null>(null);
+
 
   const [currentTime, setCurrentTime] = useState<string>("");
 
@@ -113,6 +116,10 @@ function ClockInForm() {
       setErrorMessage("Please enter your full name.");
       return;
     }
+    if (!secretWord.trim()) {
+      setErrorMessage("Please enter the unique class secret word announced by the lecturer in class.");
+      return;
+    }
 
     setSubmitting(true);
 
@@ -121,11 +128,13 @@ function ClockInForm() {
         sessionId: selectedCourseOrSession,
         matricNumber: matricNumber.trim().toUpperCase(),
         fullName: fullName.trim(),
+        secretWord: secretWord.trim().toUpperCase(),
         deviceFingerprint: fingerprint,
         latitude: location?.lat,
         longitude: location?.lng,
-        qrToken: urlQrToken,
+        qrToken: urlQrToken || secretWord.trim().toUpperCase(),
       };
+
 
       const res = await fetch("/api/clock-in", {
         method: "POST",
@@ -271,7 +280,29 @@ function ClockInForm() {
               </div>
             </div>
 
+            {/* Unique Class Attendance Secret Word */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Class Attendance Secret Word <span className="text-rose-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Enter secret word announced in class..."
+                  value={secretWord}
+                  onChange={(e) => setSecretWord(e.target.value.toUpperCase())}
+                  required
+                  className="w-full text-xs font-mono font-bold tracking-widest text-purple-950 bg-purple-50/60 border border-purple-300 rounded-xl p-3 pl-9 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent transition-all uppercase placeholder:normal-case placeholder:font-sans placeholder:font-normal placeholder:text-slate-400"
+                />
+                <KeyRound className="w-4 h-4 text-purple-600 absolute left-3 top-3.5" />
+              </div>
+              <p className="text-[11px] text-slate-500 italic">
+                Only students physically attending the lecture will receive this unique word from the lecturer.
+              </p>
+            </div>
+
             {/* Submit Button */}
+
             <button
               type="submit"
               disabled={submitting}

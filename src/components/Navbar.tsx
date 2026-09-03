@@ -122,16 +122,9 @@ export function Navbar() {
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
-            ) : (
-              <Link
-                href="/login"
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Sign In</span>
-              </Link>
-            )}
+            ) : null}
           </div>
+
 
           {/* Mobile menu hamburger */}
           <div className="flex md:hidden items-center gap-2">
@@ -191,17 +184,9 @@ export function Navbar() {
                     <span>Sign Out</span>
                   </button>
                 </div>
-              ) : (
-                <Link
-                  href="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center justify-center gap-2 w-full py-2 text-xs font-bold text-slate-700 bg-slate-100 rounded-lg"
-                >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Portal Sign In</span>
-                </Link>
-              )}
+              ) : null}
             </div>
+
           </div>
         )}
       </div>

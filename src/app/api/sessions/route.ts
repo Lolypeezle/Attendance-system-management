@@ -1,38 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { signSessionQrToken } from "@/lib/tokens";
-import { logAudit } from "@/lib/audit";
-import { SessionStatus } from "@/lib/types";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await getCurrentUser();
     const { searchParams } = new URL(req.url);
     const courseId = searchParams.get("courseId");
 
-    const whereClause: any = {};
+    let query = supabase
+      .from("Session")
+      .select(`
+        id,
+        course_id,
+        opened_by,
+        opened_at,
+        closed_at,
+        duration_minutes,
+        late_threshold_minutes,
+        qr_token,
+        status,
+        created_at,
+        course:Course(id, course_code, course_title, level)
+      `)
+      .order("opened_at", { ascending: false });
+
     if (courseId) {
-      whereClause.course_id = courseId;
-    } else if (user?.role === "LECTURER") {
-      whereClause.opened_by = user.userId;
+      query = query.eq("course_id", courseId);
     }
 
-    const sessions = await prisma.session.findMany({
-      where: whereClause,
-      include: {
-        course: true,
-        lecturer: { select: { id: true, name: true, email: true } },
-        _count: {
-          select: { attendance_records: true },
-        },
-      },
-      orderBy: { opened_at: "desc" },
-    });
+    const { data: sessions, error } = await query;
 
-    return NextResponse.json({ sessions });
+    if (error) {
+      console.error("Fetch sessions Supabase error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ sessions: sessions || [] });
   } catch (error) {
     console.error("Fetch sessions error:", error);
     return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 });
@@ -42,132 +47,149 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN")) {
-      return NextResponse.json({ error: "Unauthorized. Lecturer access required." }, { status: 403 });
+    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN" && user.role !== "ADMIN")) {
+      return NextResponse.json({ error: "Unauthorized. Admin or Lecturer access required." }, { status: 403 });
     }
 
     const {
       courseId,
-      durationMinutes = 60,
+      lectureDate, // e.g. "2026-09-04"
+      lectureStartTime, // e.g. "09:00" in WAT
+      durationMinutes = 90,
       lateThresholdMinutes = 15,
-      requireQr = false,
-      requireGeo = false,
+      secretWord, // e.g. "ALGORITHM"
     } = await req.json();
 
     if (!courseId) {
-      return NextResponse.json({ error: "Please select a course to start a session." }, { status: 400 });
+      return NextResponse.json({ error: "Please select a course to schedule." }, { status: 400 });
     }
 
-    const course = await prisma.course.findUnique({
-      where: { id: courseId },
-    });
-
-    if (!course) {
-      return NextResponse.json({ error: "Course not found." }, { status: 404 });
+    if (!secretWord || !secretWord.trim()) {
+      return NextResponse.json({ error: "Please provide a unique secret word for class attendance." }, { status: 400 });
     }
 
-    // Check if there is already an active session for this course
-    const activeExisting = await prisma.session.findFirst({
-      where: {
-        course_id: courseId,
-        status: SessionStatus.OPEN,
-      },
-    });
-
-    if (activeExisting) {
-      return NextResponse.json(
-        {
-          error: `An active session is already open for ${course.course_code}. Please close it before opening a new one.`,
-          existingSessionId: activeExisting.id,
-        },
-        { status: 409 }
-      );
+    // Resolve start timestamp in Nigeria Time (WAT: UTC+1)
+    let openedAt: string;
+    if (lectureDate && lectureStartTime) {
+      // Parse ISO string with +01:00 (Nigeria WAT)
+      openedAt = new Date(`${lectureDate}T${lectureStartTime}:00+01:00`).toISOString();
+    } else {
+      openedAt = new Date().toISOString();
     }
 
-    const session = await prisma.session.create({
-      data: {
+    const cleanSecretWord = secretWord.trim().toUpperCase();
+
+    // Check if an active session already exists for this course
+    const { data: existingSession } = await supabase
+      .from("Session")
+      .select("id")
+      .eq("course_id", courseId)
+      .eq("status", "OPEN")
+      .maybeSingle();
+
+    if (existingSession) {
+      // Update existing session with new secret word and schedule
+      const { data: updated, error: updateError } = await supabase
+        .from("Session")
+        .update({
+          opened_at: openedAt,
+          duration_minutes: parseInt(durationMinutes, 10),
+          late_threshold_minutes: parseInt(lateThresholdMinutes, 10),
+          qr_token: cleanSecretWord,
+          status: "OPEN",
+        })
+        .eq("id", existingSession.id)
+        .select(`
+          *,
+          course:Course(id, course_code, course_title, level)
+        `)
+        .single();
+
+      if (updateError) throw updateError;
+      return NextResponse.json({ success: true, session: updated, updated: true });
+    }
+
+    // Insert new scheduled session
+    const sessionId = `ses_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const { data: newSession, error: insertError } = await supabase
+      .from("Session")
+      .insert({
+        id: sessionId,
         course_id: courseId,
         opened_by: user.userId,
+        opened_at: openedAt,
         duration_minutes: parseInt(durationMinutes, 10),
         late_threshold_minutes: parseInt(lateThresholdMinutes, 10),
-        require_qr: Boolean(requireQr),
-        require_geo: Boolean(requireGeo),
-        qr_token: "",
-        status: SessionStatus.OPEN,
-      },
-      include: {
-        course: true,
-        lecturer: { select: { id: true, name: true } },
-      },
-    });
+        qr_token: cleanSecretWord,
+        status: "OPEN",
+      })
+      .select(`
+        *,
+        course:Course(id, course_code, course_title, level)
+      `)
+      .single();
 
-    const expiresAt = Date.now() + durationMinutes * 60 * 1000;
-    const qrToken = signSessionQrToken(session.id, expiresAt);
+    if (insertError) {
+      console.error("Session insert error:", insertError);
+      throw insertError;
+    }
 
-    await prisma.session.update({
-      where: { id: session.id },
-      data: { qr_token: qrToken },
-    });
-    session.qr_token = qrToken;
-
-
-    await logAudit({
-      actorId: user.userId,
-      actorName: user.name,
-      action: "SESSION_OPENED",
-      entityType: "Session",
-      entityId: session.id,
-      newValue: {
-        course: course.course_code,
-        durationMinutes,
-        lateThresholdMinutes,
-        requireQr,
-      },
-    });
-
-    return NextResponse.json({ success: true, session });
-  } catch (error) {
-    console.error("Create session error:", error);
-    return NextResponse.json({ error: "Failed to open session" }, { status: 500 });
+    return NextResponse.json({ success: true, session: newSession });
+  } catch (error: any) {
+    console.error("Create/update session error:", error);
+    return NextResponse.json({ error: error.message || "Failed to schedule session" }, { status: 500 });
   }
 }
 
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN")) {
+    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN" && user.role !== "ADMIN")) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
     }
 
-    const { sessionId, action } = await req.json();
+    const { sessionId, action, secretWord } = await req.json();
 
     if (!sessionId) {
       return NextResponse.json({ error: "Session ID required" }, { status: 400 });
     }
 
     if (action === "CLOSE") {
-      const updated = await prisma.session.update({
-        where: { id: sessionId },
-        data: {
-          status: SessionStatus.CLOSED,
-          closed_at: new Date(),
-        },
-      });
+      const { data: updated, error } = await supabase
+        .from("Session")
+        .update({
+          status: "CLOSED",
+          closed_at: new Date().toISOString(),
+        })
+        .eq("id", sessionId)
+        .select()
+        .single();
 
-      await logAudit({
-        actorId: user.userId,
-        actorName: user.name,
-        action: "SESSION_CLOSED",
-        entityType: "Session",
-        entityId: sessionId,
-      });
+      if (error) throw error;
+      return NextResponse.json({ success: true, session: updated });
+    }
 
+    if (action === "UPDATE_SECRET_WORD") {
+      if (!secretWord || !secretWord.trim()) {
+        return NextResponse.json({ error: "Secret word is required." }, { status: 400 });
+      }
+
+      const { data: updated, error } = await supabase
+        .from("Session")
+        .update({
+          qr_token: secretWord.trim().toUpperCase(),
+        })
+        .eq("id", sessionId)
+        .select()
+        .single();
+
+      if (error) throw error;
       return NextResponse.json({ success: true, session: updated });
     }
 
     return NextResponse.json({ error: "Unsupported session action" }, { status: 400 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update session error:", error);
-    return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to update session" }, { status: 500 });
   }
 }

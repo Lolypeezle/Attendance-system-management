@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
       sessionId,
       matricNumber,
       fullName,
+      secretWord,
       deviceFingerprint,
       latitude,
       longitude,
@@ -85,7 +86,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Selected course/session does not exist." }, { status: 404 });
     }
 
+    // 1.5. Validate Unique Secret Word (Announced by Lecturer in Physical Class)
+    const requiredSecretWord = (session.qr_token || "").trim();
+    if (requiredSecretWord && !requiredSecretWord.startsWith("token-")) {
+      const providedWord = (secretWord || qrToken || "").trim().toUpperCase();
+      if (!providedWord || providedWord !== requiredSecretWord.toUpperCase()) {
+        return NextResponse.json(
+          {
+            error:
+              "Invalid Class Attendance Secret Word! You must physically attend the lecture to obtain the unique secret word from your lecturer in class.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
     // 2. Real-time Matric Validation & Universal Acceptance
+
     let { data: student } = await supabase
       .from("StudentProfile")
       .select("*, enrollments:Enrollment(*)")
