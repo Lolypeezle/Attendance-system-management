@@ -21,7 +21,7 @@ export default function StudentPortalPage() {
         </div>
 
         <div className="space-y-1">
-          <h1 className="text-xl font-black text-slate-900">Student Attendance Portal</h1>
+          <h1 className="text-xl font-black text-slate-900">Student Attendance Verification</h1>
           <p className="text-xs text-slate-500">
             Attendance history and ledger records are restricted to Department Administration.
           </p>

@@ -114,7 +114,7 @@ export default function LoginPage() {
         <div className="text-center space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-fuoye-green text-xs font-bold">
             <Lock className="w-3.5 h-3.5" />
-            <span>Secure Portal Access</span>
+            <span>Secure Staff & Admin Access</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900">
             {mode === "login" ? "Sign In to FUOYE SAMS" : "Create Student Account"}

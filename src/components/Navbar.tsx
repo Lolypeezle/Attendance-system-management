@@ -52,7 +52,9 @@ export function Navbar() {
 
   const navLinks = [
     { href: "/clock-in", label: "Clock In", icon: Clock, highlight: true },
-    { href: "/admin", label: "Admin Portal", icon: ShieldCheck },
+    ...(currentUser && (currentUser.role === "SUPERADMIN" || currentUser.role === "ADMIN")
+      ? [{ href: "/admin", label: "Dashboard", icon: ShieldCheck }]
+      : []),
   ];
 
 

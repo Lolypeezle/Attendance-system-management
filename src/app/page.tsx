@@ -68,23 +68,15 @@ export default function HomePage() {
             dynamic signed QR tokens, hardware-assisted anti-proxy validation, and real-time HOD analytics.
           </p>
 
-          {/* Primary CTA Buttons */}
+          {/* Primary CTA Button */}
           <div className="pt-4 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
             <Link
               href="/clock-in"
-              className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold text-sm sm:text-base shadow-lg shadow-amber-500/30 hover:brightness-110 transition-all flex items-center gap-2 group"
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 font-extrabold text-base shadow-lg shadow-amber-500/30 hover:brightness-110 transition-all flex items-center gap-2 group"
             >
               <Clock className="w-5 h-5 text-slate-950" />
               <span>Clock In for Lecture</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-
-            <Link
-              href="/student"
-              className="px-6 py-3.5 rounded-xl bg-white/10 hover:bg-white/20 backdrop-blur border border-white/20 text-white font-semibold text-sm sm:text-base transition-colors flex items-center gap-2"
-            >
-              <GraduationCap className="w-5 h-5 text-amber-300" />
-              <span>Student Portal</span>
             </Link>
           </div>
         </div>
@@ -160,104 +152,57 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Role Navigation Cards */}
+      {/* Student Attendance Flow Guide */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center max-w-2xl mx-auto mb-10 space-y-2">
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
-            Dedicated Portals by Role
+            How Class Attendance Works
           </h2>
           <p className="text-sm text-slate-600">
-            Every stakeholder has tailored workflows built specifically for FUOYE academic requirements.
+            Follow three quick steps to record your verified physical attendance in Nigeria Time (WAT).
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Student Card */}
-          <Link
-            href="/student"
-            className="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 text-fuoye-green flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <GraduationCap className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 group-hover:text-fuoye-green transition-colors">
-                Student Portal
-              </h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Check personal course attendance percentages, view 70% threshold warning indicators, and submit excuse requests with medical evidence.
-              </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-fuoye-green flex items-center justify-center font-black text-sm">
+              1
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-fuoye-green gap-1">
-              <span>Access Student Desk</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+            <h3 className="text-base font-bold text-slate-900">Select 300L Course</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Pick your lecture from CSC 302 through CSC 320. Active lecturer sessions highlight automatically.
+            </p>
+          </div>
 
-          {/* Lecturer Card */}
-          <Link
-            href="/lecturer"
-            className="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <LayoutDashboard className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
-                Lecturer Hub
-              </h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Open lecture sessions, display live projector QR codes, watch real-time clock-in lists, approve student excuse requests, and export reports.
-              </p>
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-black text-sm">
+              2
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-amber-700 gap-1">
-              <span>Manage Sessions</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+            <h3 className="text-base font-bold text-slate-900">Enter Matric Number</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Enter your FUOYE matriculation number. Your attendance is instantly matched to your departmental profile.
+            </p>
+          </div>
 
-          {/* HOD Card */}
-          <Link
-            href="/hod"
-            className="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between"
-          >
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <BarChart3 className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-700 transition-colors">
-                HOD Analytics
-              </h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Department-wide attendance rates, course heatmaps, weekly trends, at-risk students directory (&lt;70%), and lecturer performance reports.
-              </p>
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-black text-sm">
+              3
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-blue-700 gap-1">
-              <span>View Department KPI</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </Link>
+            <h3 className="text-base font-bold text-slate-900">Secret Word Verification</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Input the unique secret code given by your lecturer in class. Codes strictly expire 1 hour after class starts.
+            </p>
+          </div>
+        </div>
 
-          {/* Admin Card */}
+        <div className="mt-10 text-center">
           <Link
-            href="/admin"
-            className="group bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md hover:border-emerald-300 transition-all flex flex-col justify-between"
+            href="/clock-in"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-fuoye-green text-white text-xs font-extrabold hover:bg-fuoye-green-dark shadow-md transition-all"
           >
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
-                Super Admin
-              </h3>
-              <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                Bulk CSV imports for students & courses, user management, immutable audit logs, campus GPS geofence settings, and JSON database backup.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center text-xs font-bold text-purple-700 gap-1">
-              <span>Admin Console</span>
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-            </div>
+            <Clock className="w-4 h-4" />
+            <span>Go to Attendance Clock-In</span>
+            <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
       </section>
