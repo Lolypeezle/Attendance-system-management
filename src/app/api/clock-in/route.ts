@@ -35,17 +35,23 @@ export async function POST(req: NextRequest) {
 
     const { data: directSession } = await supabase
       .from("Session")
-      .select("*, course:Course(*), lecturer:User(name, email)")
+      .select("*")
       .eq("id", sessionId)
       .maybeSingle();
 
     if (directSession) {
       session = directSession;
+      const { data: courseData } = await supabase
+        .from("Course")
+        .select("*")
+        .eq("id", directSession.course_id)
+        .maybeSingle();
+      session.course = courseData;
     } else {
       // Find course by ID or course code
       const { data: course } = await supabase
         .from("Course")
-        .select("*, lecturer:User(name, email)")
+        .select("*")
         .or(`id.eq.${sessionId},course_code.eq.${sessionId}`)
         .maybeSingle();
 
@@ -53,7 +59,7 @@ export async function POST(req: NextRequest) {
         // Find existing open session or create one on the fly
         const { data: openSession } = await supabase
           .from("Session")
-          .select("*, course:Course(*), lecturer:User(name, email)")
+          .select("*")
           .eq("course_id", course.id)
           .eq("status", "OPEN")
           .order("opened_at", { ascending: false })
@@ -61,6 +67,7 @@ export async function POST(req: NextRequest) {
 
         if (openSession) {
           session = openSession;
+          session.course = course;
         } else {
           const { data: newSession } = await supabase
             .from("Session")
@@ -74,19 +81,60 @@ export async function POST(req: NextRequest) {
               require_qr: false,
               require_geo: false,
             })
-            .select("*, course:Course(*), lecturer:User(name, email)")
+            .select()
             .single();
 
           session = newSession;
+          if (session) session.course = course;
         }
       }
     }
+
+
 
     if (!session) {
       return NextResponse.json({ error: "Selected course/session does not exist." }, { status: 404 });
     }
 
+function parseTimestamp(ts: any): number {
+  if (!ts) return Date.now();
+  if (ts instanceof Date) return ts.getTime();
+  if (typeof ts === "string") {
+    const trimmed = ts.trim();
+    if (!trimmed.endsWith("Z") && !trimmed.includes("+") && !trimmed.slice(10).includes("-")) {
+      return new Date(`${trimmed}Z`).getTime();
+    }
+    return new Date(trimmed).getTime();
+  }
+  return new Date(ts).getTime();
+}
+
+    // 1.3. Enforce 1-Hour Code Expiration Window from Lecture Start Time
+    const nowTime = Date.now();
+    const sessionStartTimeMs = parseTimestamp(session.opened_at);
+    const sessionStartTime = new Date(sessionStartTimeMs);
+    const elapsedMinutesFromStart = (nowTime - sessionStartTimeMs) / (1000 * 60);
+
+    // If student arrives more than 1 hour (60 mins) after class started, lock them out!
+    if (elapsedMinutesFromStart > 60) {
+      const startTimeWAT = sessionStartTime.toLocaleTimeString("en-NG", {
+        timeZone: "Africa/Lagos",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      });
+      return NextResponse.json(
+        {
+          error: `Attendance Locked! This lecture started at ${startTimeWAT} (WAT). The unique attendance code expires strictly 1 hour after class start time. You arrived ${Math.round(
+            elapsedMinutesFromStart
+          )} minutes late and can no longer clock in.`,
+        },
+        { status: 403 }
+      );
+    }
+
     // 1.5. Validate Unique Secret Word (Announced by Lecturer in Physical Class)
+
     const requiredSecretWord = (session.qr_token || "").trim();
     if (requiredSecretWord && !requiredSecretWord.startsWith("token-")) {
       const providedWord = (secretWord || qrToken || "").trim().toUpperCase();
@@ -155,9 +203,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. Automatic Punctuality & Late Categorization
-    const now = new Date();
-    const sessionStartTime = new Date(session.opened_at);
-    const elapsedMinutes = Math.max(0, Math.round((now.getTime() - sessionStartTime.getTime()) / (1000 * 60)));
+    const elapsedMinutes = Math.max(0, Math.round(elapsedMinutesFromStart));
+
     const lateThreshold = session.late_threshold_minutes || 15;
     const isLate = elapsedMinutes > lateThreshold;
     const status: AttendanceStatus = isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT;

@@ -339,8 +339,17 @@ export default function AdminSessionsPage() {
               </p>
             </div>
 
+            {/* 1-Hour Strict Policy Notice */}
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-2">
+              <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+              <span>
+                <strong>Strict 1-Hour Rule:</strong> The secret word expires automatically <strong>1 hour (60 minutes)</strong> after the class start time. Students arriving more than 1 hour late are locked out and cannot clock in.
+              </span>
+            </div>
+
             <button
               type="submit"
+
               disabled={saving}
               className="w-full py-3 px-4 rounded-xl bg-fuoye-green hover:bg-fuoye-green-dark text-white font-extrabold shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >
@@ -427,9 +436,30 @@ export default function AdminSessionsPage() {
                         </span>
                         <span className="flex items-center gap-1 font-bold text-slate-800">
                           <Clock className="w-3.5 h-3.5 text-slate-400" />
-                          {startTimeWAT} (WAT)
+                          Starts: {startTimeWAT} (WAT)
                         </span>
-                        <span>• Grace Period: {s.late_threshold_minutes} mins</span>
+                        {(() => {
+                          const openedTime = new Date(s.opened_at).getTime();
+                          const codeExpiresTime = openedTime + 60 * 60 * 1000;
+                          const isExpired = Date.now() > codeExpiresTime;
+                          const expiryTimeWAT = new Date(codeExpiresTime).toLocaleTimeString("en-NG", {
+                            timeZone: "Africa/Lagos",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                          });
+                          return (
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                isExpired
+                                  ? "bg-rose-100 text-rose-800 border border-rose-300"
+                                  : "bg-amber-100 text-amber-800 border border-amber-300"
+                              }`}
+                            >
+                              Code Window: {expiryTimeWAT} WAT ({isExpired ? "Expired (>1hr)" : "Valid for 1hr"})
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -438,6 +468,7 @@ export default function AdminSessionsPage() {
                       <div className="text-right">
                         <span className="text-[10px] uppercase font-bold text-slate-400 block">
                           Class Secret Word
+
                         </span>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className="font-mono font-black text-sm text-purple-900 bg-purple-50 px-3 py-1 rounded-xl border border-purple-200 shadow-inner">
