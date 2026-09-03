@@ -10,7 +10,6 @@ import {
   AlertCircle,
   Loader2,
   Shield,
-  MapPin,
   Clock,
   Sparkles,
 } from "lucide-react";
@@ -24,9 +23,6 @@ export default function AdminSettingsPage() {
   // Form values mapped
   const [attendanceThreshold, setAttendanceThreshold] = useState("70");
   const [warningThreshold, setWarningThreshold] = useState("75");
-  const [campusLat, setCampusLat] = useState("7.7983");
-  const [campusLng, setCampusLng] = useState("5.2974");
-  const [campusRadiusM, setCampusRadiusM] = useState("2000");
   const [defaultLateMinutes, setDefaultLateMinutes] = useState("15");
   const [academicSession, setAcademicSession] = useState("2025/2026");
   const [currentSemester, setCurrentSemester] = useState("FIRST");
@@ -40,9 +36,6 @@ export default function AdminSettingsPage() {
         sList.forEach((s: any) => {
           if (s.key === "attendance_threshold") setAttendanceThreshold(s.value);
           if (s.key === "warning_threshold") setWarningThreshold(s.value);
-          if (s.key === "campus_lat") setCampusLat(s.value);
-          if (s.key === "campus_lng") setCampusLng(s.value);
-          if (s.key === "campus_radius_m") setCampusRadiusM(s.value);
           if (s.key === "default_late_minutes") setDefaultLateMinutes(s.value);
           if (s.key === "academic_session") setAcademicSession(s.value);
           if (s.key === "current_semester") setCurrentSemester(s.value);
@@ -60,9 +53,6 @@ export default function AdminSettingsPage() {
     const payload = [
       { key: "attendance_threshold", value: attendanceThreshold },
       { key: "warning_threshold", value: warningThreshold },
-      { key: "campus_lat", value: campusLat },
-      { key: "campus_lng", value: campusLng },
-      { key: "campus_radius_m", value: campusRadiusM },
       { key: "default_late_minutes", value: defaultLateMinutes },
       { key: "academic_session", value: academicSession },
       { key: "current_semester", value: currentSemester },
@@ -106,7 +96,7 @@ export default function AdminSettingsPage() {
         <div>
           <h1 className="text-2xl font-black text-slate-900">Academic Policy & System Settings</h1>
           <p className="text-xs text-slate-500">
-            Configure system-wide thresholds, geofencing coordinates, and lecture session defaults.
+            Configure system-wide attendance thresholds and lecture session defaults.
           </p>
         </div>
       </div>
@@ -167,63 +157,7 @@ export default function AdminSettingsPage() {
           </div>
         </div>
 
-        {/* Card 2: Campus Geolocation Parameters */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <MapPin className="w-4 h-4 text-amber-600" />
-            <h2 className="text-sm font-bold text-slate-900 uppercase">
-              FUOYE Main Campus Geofence Boundary
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700 uppercase">
-                Campus Latitude (°N)
-              </label>
-              <input
-                type="text"
-                value={campusLat}
-                onChange={(e) => setCampusLat(e.target.value)}
-                required
-                className="w-full text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded-xl p-2.5"
-              />
-              <span className="text-[10px] text-slate-500">Default: 7.7983 (Oye-Ekiti)</span>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700 uppercase">
-                Campus Longitude (°E)
-              </label>
-              <input
-                type="text"
-                value={campusLng}
-                onChange={(e) => setCampusLng(e.target.value)}
-                required
-                className="w-full text-xs font-mono font-bold bg-slate-50 border border-slate-300 rounded-xl p-2.5"
-              />
-              <span className="text-[10px] text-slate-500">Default: 5.2974 (Ekiti State)</span>
-            </div>
-
-            <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700 uppercase">
-                Allowed Radius (Meters)
-              </label>
-              <input
-                type="number"
-                min="500"
-                max="10000"
-                value={campusRadiusM}
-                onChange={(e) => setCampusRadiusM(e.target.value)}
-                required
-                className="w-full text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl p-2.5"
-              />
-              <span className="text-[10px] text-slate-500">Perimeter buffer zone</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Session & Academic Session Defaults */}
+        {/* Card 2: Session & Academic Session Defaults */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
             <Clock className="w-4 h-4 text-blue-600" />

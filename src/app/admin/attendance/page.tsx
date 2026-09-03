@@ -129,7 +129,7 @@ export default function AdminAttendanceHistoryPage() {
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Real-time tracking of student clock-in timestamps, automated Early vs. Late categorization, and class audit trails.
+            Real-time tracking of student clock-in timestamps, automated Early vs. Late categorization, and class attendance records.
           </p>
         </div>
 
