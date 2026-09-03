@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -11,26 +11,40 @@ export async function GET() {
       return NextResponse.json({ user: null }, { status: 401 });
     }
 
-    const dbUser = await prisma.user.findUnique({
-      where: { id: userPayload.userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        student_profile: {
-          select: {
-            id: true,
-            matric_number: true,
-            level: true,
-          },
-        },
-      },
-    });
+    // Lookup user in Supabase
+    let { data: dbUser } = await supabase
+      .from("User")
+      .select("*, student_profile:StudentProfile(*)")
+      .eq("id", userPayload.userId)
+      .maybeSingle();
 
     if (!dbUser) {
-      return NextResponse.json({ user: null }, { status: 401 });
+      const { data: userByEmail } = await supabase
+        .from("User")
+        .select("*, student_profile:StudentProfile(*)")
+        .eq("email", userPayload.email)
+        .maybeSingle();
+
+      dbUser = userByEmail;
     }
+
+    if (!dbUser) {
+      // Return JWT payload if DB row hasn't synced yet
+      return NextResponse.json({
+        user: {
+          id: userPayload.userId,
+          name: userPayload.name,
+          email: userPayload.email,
+          role: userPayload.role,
+          studentId: userPayload.studentId,
+          matricNumber: userPayload.matricNumber,
+        },
+      });
+    }
+
+    const studentProfile = Array.isArray(dbUser.student_profile)
+      ? dbUser.student_profile[0]
+      : dbUser.student_profile;
 
     return NextResponse.json({
       user: {
@@ -38,12 +52,14 @@ export async function GET() {
         name: dbUser.name,
         email: dbUser.email,
         role: dbUser.role,
-        studentId: dbUser.student_profile?.id,
-        matricNumber: dbUser.student_profile?.matric_number,
-        level: dbUser.student_profile?.level,
+        studentId: studentProfile?.id,
+        matricNumber: studentProfile?.matric_number,
+        level: studentProfile?.level,
       },
     });
   } catch (error) {
+    console.error("Auth me error:", error);
     return NextResponse.json({ user: null }, { status: 500 });
   }
 }
+
