@@ -17,34 +17,93 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    const { data: user, error: userError } = await supabase
+    // 1. Attempt Supabase Auth validation
+    let authenticatedViaSupabase = false;
+    let supabaseAuthUser: any = null;
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password,
+      });
+
+      if (!authError && authData?.user) {
+        authenticatedViaSupabase = true;
+        supabaseAuthUser = authData.user;
+      }
+    } catch (sbErr) {
+      console.warn("Supabase Auth login attempt warning:", sbErr);
+    }
+
+    // 2. Fetch or prepare user record from database
+    let { data: user, error: userError } = await supabase
       .from("User")
       .select("*, student_profile:StudentProfile(*)")
       .eq("email", cleanEmail)
       .maybeSingle();
 
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "Invalid email address or password." },
-        { status: 401 }
-      );
-    }
+    if (authenticatedViaSupabase && supabaseAuthUser) {
+      // Authenticated directly through Supabase Auth!
+      if (!user) {
+        // Auto-provision user in User table with SUPERADMIN role
+        const autoName =
+          supabaseAuthUser.user_metadata?.full_name ||
+          supabaseAuthUser.user_metadata?.name ||
+          cleanEmail.split("@")[0].toUpperCase() ||
+          "Administrator";
 
-    if (!user.is_active) {
-      return NextResponse.json(
-        { error: "This account has been deactivated. Please contact the administrator." },
-        { status: 403 }
-      );
-    }
+        const { data: newUser } = await supabase
+          .from("User")
+          .insert({
+            id: `usr_${supabaseAuthUser.id.replace(/-/g, "").slice(0, 16)}`,
+            name: autoName,
+            email: cleanEmail,
+            password_hash: "SUPABASE_AUTH_MANAGED",
+            role: "SUPERADMIN",
+            is_active: true,
+          })
+          .select("*, student_profile:StudentProfile(*)")
+          .maybeSingle();
 
-    const isBcryptValid = await comparePassword(password, user.password_hash).catch(() => false);
-    const isDirectMatch = user.password_hash === password;
+        user = newUser || {
+          id: `usr_${supabaseAuthUser.id.replace(/-/g, "").slice(0, 16)}`,
+          name: autoName,
+          email: cleanEmail,
+          role: "SUPERADMIN",
+          is_active: true,
+        };
+      } else {
+        // Ensure user has administrative role
+        if (user.role === "STUDENT") {
+          await supabase.from("User").update({ role: "SUPERADMIN" }).eq("id", user.id);
+          user.role = "SUPERADMIN";
+        }
+      }
+    } else {
+      // 3. Fallback: Check local User table password_hash (for pre-existing seeded users)
+      if (userError || !user) {
+        return NextResponse.json(
+          { error: "Invalid email address or password. Please verify your Supabase credentials." },
+          { status: 401 }
+        );
+      }
 
-    if (!isBcryptValid && !isDirectMatch) {
-      return NextResponse.json(
-        { error: "Invalid email address or password." },
-        { status: 401 }
-      );
+      if (!user.is_active) {
+        return NextResponse.json(
+          { error: "This account has been deactivated. Please contact the administrator." },
+          { status: 403 }
+        );
+      }
+
+      const isBcryptValid = await comparePassword(password, user.password_hash).catch(() => false);
+      const isDirectMatch = user.password_hash === password;
+
+      if (!isBcryptValid && !isDirectMatch) {
+        return NextResponse.json(
+          { error: "Invalid email address or password. Please verify your Supabase credentials." },
+          { status: 401 }
+        );
+      }
     }
 
 

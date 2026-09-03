@@ -23,9 +23,16 @@ export function Footer() {
             <p className="italic text-slate-300 font-serif text-[12px]">
               &ldquo;Innovation and Character for National Transformation&rdquo;
             </p>
-            <p className="text-[11px] text-slate-500 mt-1">
-              Student Attendance Management System (SAMS) • 2025/2026 Academic Session
-            </p>
+            <div className="text-[11px] text-slate-500 mt-1 flex flex-wrap items-center justify-center md:justify-end gap-2">
+              <span>Student Attendance Management System (SAMS) • 2025/2026 Academic Session</span>
+              <span className="hidden sm:inline">•</span>
+              <a
+                href="/login"
+                className="text-slate-500 hover:text-slate-300 transition-colors underline"
+              >
+                Admin Login
+              </a>
+            </div>
           </div>
         </div>
       </div>
