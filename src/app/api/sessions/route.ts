@@ -133,13 +133,20 @@ export async function POST(req: NextRequest) {
     // Resolve start timestamp in Nigeria Time (WAT: UTC+1)
     let openedAt: string;
     if (lectureDate && lectureStartTime) {
-      // Parse ISO string with +01:00 (Nigeria WAT)
-      openedAt = new Date(`${lectureDate}T${lectureStartTime}:00+01:00`).toISOString();
+      const timePart = lectureStartTime.length === 5 ? `${lectureStartTime}:00` : lectureStartTime;
+      openedAt = new Date(`${lectureDate}T${timePart}+01:00`).toISOString();
     } else {
       openedAt = new Date().toISOString();
     }
 
     const cleanSecretWord = secretWord.trim().toUpperCase();
+
+    // Associate lecturer with course if unassigned
+    await supabase
+      .from("Course")
+      .update({ lecturer_id: user.userId })
+      .eq("id", courseId)
+      .is("lecturer_id", null);
 
     // Check if an active session already exists for this course
     const { data: existingSession } = await supabase
@@ -155,6 +162,7 @@ export async function POST(req: NextRequest) {
         .from("Session")
         .update({
           opened_at: openedAt,
+          opened_by: user.userId,
           duration_minutes: parseInt(durationMinutes, 10),
           late_threshold_minutes: parseInt(lateThresholdMinutes, 10),
           qr_token: cleanSecretWord,

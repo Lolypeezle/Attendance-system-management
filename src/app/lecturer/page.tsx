@@ -25,6 +25,7 @@ import {
   History,
   Search,
   Download,
+  Calendar,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { StatCard } from "@/components/StatCard";
@@ -41,9 +42,27 @@ export default function LecturerPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Helper for current date in YYYY-MM-DD
+  const getTodayDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const getCurrentTimeString = () => {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
   // New Session Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState("");
+  const [lectureDate, setLectureDate] = useState(getTodayDateString());
+  const [lectureStartTime, setLectureStartTime] = useState(getCurrentTimeString());
   const [durationMinutes, setDurationMinutes] = useState("60");
   const [lateThreshold, setLateThreshold] = useState("15");
   const [secretWord, setSecretWord] = useState("");
@@ -66,6 +85,8 @@ export default function LecturerPage() {
 
   const openNewSessionModal = () => {
     setSecretWord(generateRandomSecretWord());
+    setLectureDate(getTodayDateString());
+    setLectureStartTime(getCurrentTimeString());
     setModalError(null);
     setIsModalOpen(true);
   };
@@ -112,6 +133,8 @@ export default function LecturerPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           courseId: selectedCourseId,
+          lectureDate,
+          lectureStartTime,
           durationMinutes: parseInt(durationMinutes, 10),
           lateThresholdMinutes: parseInt(lateThreshold, 10),
           secretWord: activeWord,
@@ -481,14 +504,14 @@ export default function LecturerPage() {
                 </label>
                 {courses.length === 0 ? (
                   <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-                    No courses are currently allocated to your lecturer account. Please contact the Department HOD or Administrator to allocate your course(s).
+                    No courses are currently loaded. Please ensure departmental courses are active.
                   </div>
                 ) : (
                   <select
                     value={selectedCourseId}
                     onChange={(e) => setSelectedCourseId(e.target.value)}
                     required
-                    className="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-xl p-2.5"
+                    className="w-full text-xs font-bold bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-slate-900"
                   >
                     {courses.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -497,6 +520,39 @@ export default function LecturerPage() {
                     ))}
                   </select>
                 )}
+              </div>
+
+              {/* Lecture Date & Scheduled Time */}
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-emerald-950 uppercase flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-fuoye-green" />
+                    <span>Lecture Date <span className="text-rose-500">*</span></span>
+                  </label>
+                  <input
+                    type="date"
+                    value={lectureDate}
+                    onChange={(e) => setLectureDate(e.target.value)}
+                    required
+                    className="w-full text-xs font-bold bg-white border border-emerald-300 rounded-xl p-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-fuoye-green shadow-2xs"
+                  />
+                  <span className="text-[10px] text-emerald-800 block">Class lecture date</span>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-emerald-950 uppercase flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5 text-fuoye-green" />
+                    <span>Start Time (WAT) <span className="text-rose-500">*</span></span>
+                  </label>
+                  <input
+                    type="time"
+                    value={lectureStartTime}
+                    onChange={(e) => setLectureStartTime(e.target.value)}
+                    required
+                    className="w-full text-xs font-bold bg-white border border-emerald-300 rounded-xl p-2.5 text-slate-800 focus:outline-none focus:ring-2 focus:ring-fuoye-green shadow-2xs"
+                  />
+                  <span className="text-[10px] text-emerald-800 block">WAT (Nigeria Time)</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

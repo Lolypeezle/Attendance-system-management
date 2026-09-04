@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
     if (level) {
       query = query.eq("level", level);
     }
-    if (user?.role === "LECTURER") {
+    const assignedOnly = searchParams.get("assignedOnly");
+    if (assignedOnly === "true" && user?.role === "LECTURER") {
       query = query.eq("lecturer_id", user.userId);
     }
 
