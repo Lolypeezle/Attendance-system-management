@@ -68,3 +68,44 @@ body {
 .animate-live-pulse {
   animation: live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Scanner reticle laser sweep animation */
+@keyframes laser-sweep {
+  0% {
+    top: 8%;
+    opacity: 0.8;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 8%;
+    opacity: 0.8;
+  }
+}
+
+.animate-laser {
+  animation: laser-sweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Html5Qrcode video containment */
+#sams-qr-reader {
+  border: none !important;
+  position: relative !important;
+}
+
+#sams-qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1.25rem !important;
+}
+
+#sams-qr-reader img {
+  display: none !important;
+}
+
+#sams-qr-reader__dashboard {
+  display: none !important;
+}
