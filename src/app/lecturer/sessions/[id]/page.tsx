@@ -24,6 +24,7 @@ import {
   Check,
   Smartphone,
   Sparkles,
+  Search,
 } from "lucide-react";
 import { QRCodeModal } from "@/components/QRCodeModal";
 import { AttendanceBadge } from "@/components/AttendanceBadge";
@@ -55,6 +56,9 @@ export default function LiveSessionPage() {
   const [savingWord, setSavingWord] = useState(false);
   const [copiedWord, setCopiedWord] = useState(false);
   const [expirySecs, setExpirySecs] = useState<number>(0);
+
+  // Search filter for clocked in students
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
 
   const fetchLiveFeed = async () => {
     try {
@@ -514,97 +518,130 @@ export default function LiveSessionPage() {
       )}
 
       {/* Live Clock-In Feed Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-3 p-5">
-        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-          <div>
-            <h2 className="text-base font-bold text-slate-900">Clocked-In Students ({records.length})</h2>
-            <p className="text-xs text-slate-500">
-              Live submission feed updating in real time. Click &quot;Edit&quot; to perform audit-logged corrections.
-            </p>
-          </div>
-        </div>
+      {(() => {
+        const filteredRecords = (records || []).filter((rec: any) => {
+          if (!studentSearchQuery.trim()) return true;
+          const q = studentSearchQuery.trim().toLowerCase();
+          return (
+            (rec.fullName && rec.fullName.toLowerCase().includes(q)) ||
+            (rec.matricNumber && rec.matricNumber.toLowerCase().includes(q))
+          );
+        });
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
-              <tr>
-                <th className="py-3 px-4">#</th>
-                <th className="py-3 px-4">Student Name</th>
-                <th className="py-3 px-4">Matric Number</th>
-                <th className="py-3 px-4">Clock-In Time</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Device / IP</th>
-                <th className="py-3 px-4">Token</th>
-                <th className="py-3 px-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 font-medium">
-              {records.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400 space-y-2">
-                    <Clock className="w-8 h-8 text-slate-300 mx-auto" />
-                    <p className="text-sm font-semibold">Waiting for students to clock in...</p>
-                    <p className="text-xs">
-                      Project the QR Code on screen or share the clock-in link.
-                    </p>
-                  </td>
-                </tr>
-              ) : (
-                records.map((rec: any, idx: number) => (
-                  <tr
-                    key={rec.id}
-                    className={`hover:bg-slate-50 transition-colors ${
-                      rec.isFlagged ? "bg-rose-50/50" : ""
-                    }`}
-                  >
-                    <td className="py-3 px-4 text-slate-400 font-mono">{idx + 1}</td>
-                    <td className="py-3 px-4 font-bold text-slate-900">{rec.fullName}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-fuoye-green">
-                      {rec.matricNumber}
-                    </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {new Date(rec.clockInTime).toLocaleTimeString([], {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        second: "2-digit",
-                      })}
-                    </td>
-                    <td className="py-3 px-4">
-                      <AttendanceBadge
-                        status={rec.status}
-                        isFlagged={rec.isFlagged}
-                        flagReason={rec.flagReason}
-                      />
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
-                      {rec.ipAddress || "127.0.0.1"}
-                    </td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-800">
-                      <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200">
-                        {rec.attendanceToken}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedRecord(rec);
-                          setNewStatus(rec.status);
-                          setCorrectionReason("");
-                          setCorrectionError(null);
-                        }}
-                        className="p-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 text-slate-600 hover:text-fuoye-green transition-colors"
-                        title="Manually Correct Status"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
+        return (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-3 p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-black text-slate-900">
+                    Clocked-In Students ({records.length})
+                  </h2>
+                  {studentSearchQuery.trim() && (
+                    <span className="text-xs font-bold text-fuoye-green px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">
+                      {filteredRecords.length} Matching
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Live submission feed updating in real time. Student full names and matriculation numbers are verified against course roster.
+                </p>
+              </div>
+
+              <div className="relative w-full sm:w-72">
+                <input
+                  type="text"
+                  placeholder="Search student full name or matric..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 pl-8 text-slate-900 focus:outline-none focus:ring-1 focus:ring-fuoye-green font-medium"
+                />
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4">#</th>
+                    <th className="py-3 px-4">Student Full Name</th>
+                    <th className="py-3 px-4">Matriculation Number</th>
+                    <th className="py-3 px-4">Clock-In Time</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Device / IP</th>
+                    <th className="py-3 px-4 text-right">Action</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {records.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400 space-y-2">
+                        <Clock className="w-8 h-8 text-slate-300 mx-auto" />
+                        <p className="text-sm font-semibold">Waiting for students to clock in...</p>
+                        <p className="text-xs">
+                          Display the QR Code on screen or verbalize the secret word to class.
+                        </p>
+                      </td>
+                    </tr>
+                  ) : filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                        No clocked-in students match &quot;{studentSearchQuery}&quot;.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((rec: any, idx: number) => (
+                      <tr
+                        key={rec.id}
+                        className={`hover:bg-slate-50 transition-colors ${
+                          rec.isFlagged ? "bg-rose-50/50" : ""
+                        }`}
+                      >
+                        <td className="py-3 px-4 text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900 text-sm">{rec.fullName}</td>
+                        <td className="py-3 px-4 font-mono font-black text-fuoye-green text-xs">
+                          {rec.matricNumber}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 font-mono">
+                          {new Date(rec.clockInTime).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </td>
+                        <td className="py-3 px-4">
+                          <AttendanceBadge
+                            status={rec.status}
+                            isFlagged={rec.isFlagged}
+                            flagReason={rec.flagReason}
+                          />
+                        </td>
+                        <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
+                          {rec.ipAddress || "127.0.0.1"}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedRecord(rec);
+                              setNewStatus(rec.status);
+                              setCorrectionReason("");
+                              setCorrectionError(null);
+                            }}
+                            className="p-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 text-slate-600 hover:text-fuoye-green transition-colors"
+                            title="Manually Correct Status"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Unclocked Students Roster */}
       {unclockedStudents.length > 0 && (

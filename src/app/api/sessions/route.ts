@@ -38,10 +38,23 @@ function enrichSession(s: any) {
     email: "",
   };
 
+  const records = (s.attendance_records || []).map((r: any) => ({
+    id: r.id,
+    matricNumber: r.matric_number,
+    fullName: r.full_name,
+    clockInTime: r.clock_in_time,
+    status: r.status,
+    isFlagged: r.is_flagged,
+  }));
+
   return {
     ...s,
     course: courseObj,
     lecturer: lecturerObj,
+    attendance_records: records,
+    records: records,
+    clockedInCount: records.length,
+    _count: { attendance_records: records.length },
     secretWord: secretWord.toUpperCase(),
     signedQrToken,
     remainingSeconds,
@@ -69,7 +82,8 @@ export async function GET(req: NextRequest) {
         status,
         created_at,
         course:Course(id, course_code, course_title, level, lecturer:User(id, name, email)),
-        lecturer:User(id, name, email)
+        lecturer:User(id, name, email),
+        attendance_records:AttendanceRecord(id, matric_number, full_name, clock_in_time, status, is_flagged)
       `)
       .order("opened_at", { ascending: false });
 
