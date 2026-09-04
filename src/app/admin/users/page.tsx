@@ -16,11 +16,16 @@ import {
   GraduationCap,
   BookOpen,
   Check,
+  Trash2,
+  AlertTriangle,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [filterRole, setFilterRole] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -30,6 +35,7 @@ export default function AdminUsersPage() {
   const [createName, setCreateName] = useState("");
   const [createEmail, setCreateEmail] = useState("");
   const [createPassword, setCreatePassword] = useState("Password@123");
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [createRole, setCreateRole] = useState("LECTURER");
   const [createAssignedCourses, setCreateAssignedCourses] = useState<string[]>([]);
   const [submittingCreate, setSubmittingCreate] = useState(false);
@@ -38,8 +44,14 @@ export default function AdminUsersPage() {
   // Reset Password Modal
   const [resetUser, setResetUser] = useState<any>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [submittingReset, setSubmittingReset] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
+
+  // Delete User Modal
+  const [deleteModalUser, setDeleteModalUser] = useState<any>(null);
+  const [submittingDelete, setSubmittingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Course Assignment Modal
   const [assignModalUser, setAssignModalUser] = useState<any>(null);
@@ -50,6 +62,12 @@ export default function AdminUsersPage() {
   useEffect(() => {
     fetchUsers();
     fetchCourses();
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.user) setCurrentUser(data.user);
+      })
+      .catch((err) => console.error(err));
   }, []);
 
   const fetchUsers = async () => {
@@ -88,10 +106,34 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deleteModalUser) return;
+    setSubmittingDelete(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/admin/users?userId=${encodeURIComponent(deleteModalUser.id)}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data.error || "Failed to delete user.");
+        setSubmittingDelete(false);
+        return;
+      }
+      setDeleteModalUser(null);
+      fetchUsers();
+    } catch {
+      setDeleteError("Network error occurred while deleting user.");
+    } finally {
+      setSubmittingDelete(false);
+    }
+  };
+
   const handleOpenAddLecturer = () => {
     setCreateName("");
     setCreateEmail("");
     setCreatePassword("Password@123");
+    setShowCreatePassword(false);
     setCreateRole("LECTURER");
     setCreateAssignedCourses([]);
     setCreateError(null);
@@ -426,21 +468,40 @@ export default function AdminUsersPage() {
                         <button
                           onClick={() => handleOpenAssignModal(user)}
                           className="px-2.5 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-fuoye-green hover:bg-emerald-100 text-xs font-bold inline-flex items-center gap-1 transition-colors"
+                          title="Assign Department Courses"
                         >
                           <BookOpen className="w-3 h-3" />
-                          <span>Assign Courses</span>
+                          <span>Assign</span>
                         </button>
                       )}
                       <button
                         onClick={() => {
                           setResetUser(user);
                           setNewPassword("");
+                          setShowResetPassword(false);
                           setResetMessage(null);
                         }}
                         className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 text-xs font-bold inline-flex items-center gap-1"
+                        title="Reset Account Password"
                       >
                         <Key className="w-3 h-3 text-amber-600" />
-                        <span>Reset Password</span>
+                        <span>Reset</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setDeleteModalUser(user);
+                          setDeleteError(null);
+                        }}
+                        disabled={currentUser && (currentUser.id === user.id || currentUser.userId === user.id)}
+                        className="px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-bold inline-flex items-center gap-1 transition-colors"
+                        title={
+                          currentUser && (currentUser.id === user.id || currentUser.userId === user.id)
+                            ? "Cannot delete your own active admin account"
+                            : `Delete ${user.role === "LECTURER" ? "Lecturer" : "User"}`
+                        }
+                      >
+                        <Trash2 className="w-3 h-3 text-rose-600" />
+                        <span>Delete</span>
                       </button>
                     </td>
                   </tr>
@@ -527,14 +588,29 @@ export default function AdminUsersPage() {
                 <label className="block text-xs font-bold text-slate-700 uppercase">
                   Initial Password
                 </label>
-                <input
-                  type="text"
-                  placeholder="Default: Password@123"
-                  value={createPassword}
-                  onChange={(e) => setCreatePassword(e.target.value)}
-                  required
-                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 font-mono focus:outline-none focus:ring-1 focus:ring-fuoye-green"
-                />
+                <div className="relative">
+                  <input
+                    type={showCreatePassword ? "text" : "password"}
+                    placeholder="Default: Password@123"
+                    value={createPassword}
+                    onChange={(e) => setCreatePassword(e.target.value)}
+                    required
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-9 font-mono focus:outline-none focus:ring-1 focus:ring-fuoye-green"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePassword(!showCreatePassword)}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    title={showCreatePassword ? "Hide password" : "Show password"}
+                  >
+                    {showCreatePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  {createRole === "LECTURER"
+                    ? "The lecturer can immediately log in with this email and password at /lecturer/login."
+                    : "The user will use this password for system login."}
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -735,14 +811,27 @@ export default function AdminUsersPage() {
                 <label className="block text-xs font-bold text-slate-700 uppercase">
                   New Password
                 </label>
-                <input
-                  type="password"
-                  placeholder="Enter minimum 6 characters"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  required
-                  className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5"
-                />
+                <div className="relative">
+                  <input
+                    type={showResetPassword ? "text" : "password"}
+                    placeholder="Enter minimum 6 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    className="w-full text-xs bg-slate-50 border border-slate-300 rounded-xl p-2.5 pr-9 focus:outline-none focus:ring-1 focus:ring-fuoye-green"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    title={showResetPassword ? "Hide password" : "Show password"}
+                  >
+                    {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  The user can immediately log in with this new password upon saving.
+                </p>
               </div>
 
               <div className="pt-2 flex justify-end gap-2">
@@ -767,6 +856,91 @@ export default function AdminUsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Modal */}
+      {deleteModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-rose-100">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-rose-100 text-rose-700">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {deleteModalUser.role === "LECTURER" ? "Delete Faculty Lecturer" : "Delete User Account"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setDeleteModalUser(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {deleteError && (
+              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900 text-sm">{deleteModalUser.name}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
+                  {deleteModalUser.role}
+                </span>
+              </div>
+              <div className="text-slate-500 font-mono text-[11px]">{deleteModalUser.email}</div>
+              {deleteModalUser.assigned_courses && deleteModalUser.assigned_courses.length > 0 && (
+                <div className="pt-1.5 border-t border-slate-200/80">
+                  <span className="text-[11px] text-slate-500 block mb-1">Currently assigned courses:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {deleteModalUser.assigned_courses.map((c: any) => (
+                      <span
+                        key={c.id}
+                        className="px-2 py-0.5 rounded bg-emerald-50 text-fuoye-green border border-emerald-200 text-[10px] font-bold"
+                      >
+                        {c.course_code}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                Are you sure you want to delete this account? Allocated courses will be unassigned so they can be reassigned to other faculty. Historical student attendance records are safely preserved.
+              </p>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModalUser(null)}
+                className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteUser}
+                disabled={submittingDelete}
+                className="px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl hover:bg-rose-700 flex items-center gap-1.5 shadow-sm transition-colors"
+              >
+                {submittingDelete ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>Delete {deleteModalUser.role === "LECTURER" ? "Lecturer" : "User"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

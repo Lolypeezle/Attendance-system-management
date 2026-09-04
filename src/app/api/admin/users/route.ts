@@ -60,8 +60,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const admin = await getCurrentUser();
-    if (!admin || admin.role !== "SUPERADMIN") {
-      return NextResponse.json({ error: "Only Super Admin can create system users." }, { status: 403 });
+    if (!admin || (admin.role !== "SUPERADMIN" && admin.role !== "HOD")) {
+      return NextResponse.json({ error: "Only administrators can create system users." }, { status: 403 });
     }
 
     const { name, email, password, role, assignedCourseIds } = await req.json();
@@ -71,18 +71,19 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPassword = password.trim();
 
     const { data: existing } = await supabase
       .from("User")
       .select("id")
-      .eq("email", cleanEmail)
+      .ilike("email", cleanEmail)
       .maybeSingle();
 
     if (existing) {
       return NextResponse.json({ error: "Email address already registered." }, { status: 409 });
     }
 
-    const passwordHash = await hashPassword(password);
+    const passwordHash = await hashPassword(cleanPassword);
     const newUserId = `usr_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
 
     const { data: newUser, error: insertErr } = await supabase
@@ -136,8 +137,8 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const admin = await getCurrentUser();
-    if (!admin || admin.role !== "SUPERADMIN") {
-      return NextResponse.json({ error: "Only Super Admin can update users." }, { status: 403 });
+    if (!admin || (admin.role !== "SUPERADMIN" && admin.role !== "HOD")) {
+      return NextResponse.json({ error: "Only administrators can update users." }, { status: 403 });
     }
 
     const { userId, action, newPassword, newRole } = await req.json();
@@ -180,7 +181,8 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (action === "RESET_PASSWORD" && newPassword) {
-      const hash = await hashPassword(newPassword);
+      const cleanPass = newPassword.trim();
+      const hash = await hashPassword(cleanPass);
       const { error: resetErr } = await supabase
         .from("User")
         .update({ password_hash: hash })
@@ -256,5 +258,124 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error("Update user error:", error);
     return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const admin = await getCurrentUser();
+    if (!admin || (admin.role !== "SUPERADMIN" && admin.role !== "HOD")) {
+      return NextResponse.json({ error: "Only administrators can delete users." }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    let userId = searchParams.get("userId");
+
+    if (!userId) {
+      try {
+        const body = await req.json();
+        userId = body?.userId;
+      } catch {
+        // body may be empty
+      }
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required." }, { status: 400 });
+    }
+
+    if (userId === admin.userId) {
+      return NextResponse.json({ error: "You cannot delete your own account." }, { status: 400 });
+    }
+
+    // Check if target user exists
+    const { data: targetUser, error: findErr } = await supabase
+      .from("User")
+      .select("id, name, email, role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (findErr) {
+      console.error("Find user error:", findErr);
+      return NextResponse.json({ error: findErr.message }, { status: 500 });
+    }
+
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+
+    // Only SUPERADMIN can delete another SUPERADMIN
+    if (targetUser.role === "SUPERADMIN" && admin.role !== "SUPERADMIN") {
+      return NextResponse.json({ error: "Only Super Admin can delete another Super Admin." }, { status: 403 });
+    }
+
+    // 1. Unassign any courses assigned to this lecturer
+    const { error: courseErr } = await supabase
+      .from("Course")
+      .update({ lecturer_id: null })
+      .eq("lecturer_id", userId);
+
+    if (courseErr) {
+      console.warn("Warning unassigning courses:", courseErr);
+    }
+
+    // 2. Reassign sessions opened by this lecturer to the current admin to preserve students' attendance history
+    const { error: sessionErr } = await supabase
+      .from("Session")
+      .update({ opened_by: admin.userId })
+      .eq("opened_by", userId);
+
+    if (sessionErr) {
+      console.warn("Warning reassigning sessions:", sessionErr);
+    }
+
+    // 3. Clear student profile reference if any
+    const { error: stdErr } = await supabase
+      .from("StudentProfile")
+      .update({ user_id: null })
+      .eq("user_id", userId);
+
+    if (stdErr) {
+      console.warn("Warning clearing student profile:", stdErr);
+    }
+
+    // 4. Delete notifications for this user
+    await supabase
+      .from("Notification")
+      .delete()
+      .eq("user_id", userId);
+
+    // 5. Delete user from User table
+    const { error: deleteErr } = await supabase
+      .from("User")
+      .delete()
+      .eq("id", userId);
+
+    if (deleteErr) {
+      console.error("Delete user error:", deleteErr);
+      return NextResponse.json({ error: deleteErr.message || "Failed to delete user." }, { status: 500 });
+    }
+
+    // 6. Log audit action
+    await logAudit({
+      actorId: admin.userId,
+      actorName: admin.name,
+      action: "USER_DELETED",
+      entityType: "User",
+      entityId: userId,
+      oldValue: {
+        name: targetUser.name,
+        email: targetUser.email,
+        role: targetUser.role,
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `${targetUser.name} (${targetUser.role}) was deleted successfully.`,
+    });
+  } catch (error: any) {
+    console.error("Delete user error:", error);
+    return NextResponse.json({ error: error.message || "Failed to delete user." }, { status: 500 });
   }
 }

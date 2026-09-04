@@ -35,6 +35,7 @@ import {
 export default function LecturerPage() {
   const [courses, setCourses] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   // New Session Modal
@@ -64,16 +65,21 @@ export default function LecturerPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [coursesRes, sessionsRes] = await Promise.all([
+      const [coursesRes, sessionsRes, meRes] = await Promise.all([
         fetch("/api/courses"),
         fetch("/api/sessions"),
+        fetch("/api/auth/me"),
       ]);
 
       const coursesData = await coursesRes.json();
       const sessionsData = await sessionsRes.json();
+      const meData = await meRes.json();
 
       setCourses(coursesData.courses || []);
       setSessions(sessionsData.sessions || []);
+      if (meData.user) {
+        setCurrentUser(meData.user);
+      }
 
       if (coursesData.courses?.length > 0) {
         setSelectedCourseId(coursesData.courses[0].id);
@@ -137,9 +143,11 @@ export default function LecturerPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold">
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Lecturer Operations Desk</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-fuoye-green text-xs font-bold">
+            <GraduationCap className="w-3.5 h-3.5" />
+            <span>
+              {currentUser ? `${currentUser.name} • ${currentUser.role}` : "Faculty Member"}
+            </span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 mt-1">Course & Session Workspace</h1>
           <p className="text-xs text-slate-500">
@@ -431,18 +439,24 @@ export default function LecturerPage() {
                 <label className="block text-xs font-bold text-slate-700 uppercase">
                   Select Course
                 </label>
-                <select
-                  value={selectedCourseId}
-                  onChange={(e) => setSelectedCourseId(e.target.value)}
-                  required
-                  className="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-xl p-2.5"
-                >
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.course_code} — {c.course_title} ({c.level})
-                    </option>
-                  ))}
-                </select>
+                {courses.length === 0 ? (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
+                    No courses are currently allocated to your lecturer account. Please contact the Department HOD or Administrator to allocate your course(s).
+                  </div>
+                ) : (
+                  <select
+                    value={selectedCourseId}
+                    onChange={(e) => setSelectedCourseId(e.target.value)}
+                    required
+                    className="w-full text-xs font-medium bg-slate-50 border border-slate-300 rounded-xl p-2.5"
+                  >
+                    {courses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.course_code} — {c.course_title} ({c.level})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -566,8 +580,8 @@ export default function LecturerPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
-                  className="px-5 py-2.5 bg-fuoye-green text-white text-xs font-extrabold rounded-xl hover:bg-fuoye-green-dark flex items-center gap-1.5 shadow-sm"
+                  disabled={creating || courses.length === 0}
+                  className="px-5 py-2.5 bg-fuoye-green text-white text-xs font-extrabold rounded-xl hover:bg-fuoye-green-dark flex items-center gap-1.5 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {creating ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
