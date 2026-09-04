@@ -23,8 +23,8 @@ export default function AdminBulkImportsPage() {
   const sampleStudentCsv = `full_name,matric_number,level,courses_enrolled
 Oladipo Victor,CSC/2021/1010,400L,"CSC 401, CSC 415"
 Adekunle Tosin,CSC/2021/1011,400L,"CSC 401, CSC 415"
-Bakare Samuel,CSC/2022/1010,300L,"CSC 301, CSC 305"
-Fashina Mariam,CSC/2023/1010,200L,CSC 201`;
+Bakare Samuel,CSC/2023/1010,300L,"CSC 301, CSC 305"
+Fashina Mariam,CSC/2023/1011,300L,CSC 201`;
 
   const sampleCourseCsv = `course_code,course_title,units,level,lecturer_email
 CSC 403,Compiler Construction & Design,3,400L,adeyemi@fuoye.edu.ng

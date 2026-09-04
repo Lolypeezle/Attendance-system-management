@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import * as XLSX from "xlsx";
 
 export const dynamic = "force-dynamic";
@@ -11,21 +11,22 @@ export async function GET(req: NextRequest) {
     const format = searchParams.get("format") || "json"; // json, csv, xlsx
     const courseId = searchParams.get("courseId");
     const sessionId = searchParams.get("sessionId");
-    const studentMatric = searchParams.get("matric");
 
     let rows: any[] = [];
     let filename = `fuoye-sams-${reportType}-${Date.now()}`;
 
     // 1. PER-COURSE REPORT
     if (reportType === "course" && courseId) {
-      const course = await prisma.course.findUnique({
-        where: { id: courseId },
-        include: {
-          lecturer: true,
-          sessions: { orderBy: { opened_at: "asc" } },
-          enrollments: { include: { student: true } },
-        },
-      });
+      const { data: course } = await supabase
+        .from("Course")
+        .select(`
+          *,
+          lecturer:User(name),
+          sessions:Session(*),
+          enrollments:Enrollment(*, student:StudentProfile(*))
+        `)
+        .eq("id", courseId)
+        .maybeSingle();
 
       if (!course) {
         return NextResponse.json({ error: "Course not found" }, { status: 404 });
@@ -33,18 +34,26 @@ export async function GET(req: NextRequest) {
 
       filename = `${course.course_code}_Attendance_Report`;
 
-      // For every enrolled student, compute stats & per-session breakdown
-      for (const en of course.enrollments) {
-        const student = en.student;
-        const records = await prisma.attendanceRecord.findMany({
-          where: {
-            student_id: student.id,
-            session: { course_id: course.id },
-          },
-        });
+      const courseSessions = course.sessions || [];
+      const sessionIds = courseSessions.map((s: any) => s.id);
+      const totalSessions = courseSessions.length;
 
-        const totalSessions = course.sessions.length;
-        const presentCount = records.filter((r) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED").length;
+      const { data: allRecords } = await supabase
+        .from("AttendanceRecord")
+        .select("*")
+        .in("session_id", sessionIds.length > 0 ? sessionIds : ["none"]);
+
+      const records = allRecords || [];
+
+      // For every enrolled student, compute stats & breakdown
+      for (const en of course.enrollments || []) {
+        const student = en.student;
+        if (!student) continue;
+
+        const studentRecords = records.filter((r: any) => r.student_id === student.id);
+        const presentCount = studentRecords.filter(
+          (r: any) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
+        ).length;
         const percentage = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 100;
 
         rows.push({
@@ -64,33 +73,44 @@ export async function GET(req: NextRequest) {
     // 2. AT-RISK STUDENTS REPORT (<70%)
     else if (reportType === "at-risk") {
       filename = `FUOYE_CSC_At_Risk_Students_Report`;
-      const courses = await prisma.course.findMany({
-        include: {
-          sessions: true,
-          enrollments: { include: { student: true } },
-        },
-      });
+      const [coursesRes, sessionsRes, attendanceRes, enrollmentsRes] = await Promise.all([
+        supabase.from("Course").select("*"),
+        supabase.from("Session").select("*"),
+        supabase.from("AttendanceRecord").select("*"),
+        supabase.from("Enrollment").select("*, student:StudentProfile(*)"),
+      ]);
+
+      const courses = coursesRes.data || [];
+      const sessions = sessionsRes.data || [];
+      const records = attendanceRes.data || [];
+      const enrollments = enrollmentsRes.data || [];
 
       for (const c of courses) {
-        const totalSessions = c.sessions.length;
+        const courseSessions = sessions.filter((s: any) => s.course_id === c.id);
+        const totalSessions = courseSessions.length;
         if (totalSessions === 0) continue;
 
-        for (const en of c.enrollments) {
-          const records = await prisma.attendanceRecord.findMany({
-            where: {
-              student_id: en.student_id,
-              session: { course_id: c.id },
-            },
-          });
+        const sessionIds = new Set(courseSessions.map((s: any) => s.id));
+        const courseEnrollments = enrollments.filter((en: any) => en.course_id === c.id);
 
-          const presentCount = records.filter((r) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED").length;
+        for (const en of courseEnrollments) {
+          const student = en.student;
+          if (!student) continue;
+
+          const studentRecords = records.filter(
+            (r: any) => sessionIds.has(r.session_id) && r.student_id === student.id
+          );
+
+          const presentCount = studentRecords.filter(
+            (r: any) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
+          ).length;
           const percentage = Math.round((presentCount / totalSessions) * 100);
 
           if (percentage < 70) {
             rows.push({
-              "Matric Number": en.student.matric_number,
-              "Student Name": en.student.full_name,
-              "Level": en.student.level,
+              "Matric Number": student.matric_number,
+              "Student Name": student.full_name,
+              "Level": student.level,
               "Course Code": c.course_code,
               "Course Title": c.course_title,
               "Sessions Attended": `${presentCount}/${totalSessions}`,
@@ -106,27 +126,34 @@ export async function GET(req: NextRequest) {
     // 3. DEPARTMENT-WIDE SUMMARY REPORT
     else if (reportType === "department") {
       filename = `FUOYE_CSC_Semester_Departmental_Attendance`;
-      const students = await prisma.studentProfile.findMany({
-        include: {
-          enrollments: { include: { course: { include: { sessions: true } } } },
-        },
-      });
+      const [studentsRes, enrollmentsRes, sessionsRes, recordsRes] = await Promise.all([
+        supabase.from("StudentProfile").select("*"),
+        supabase.from("Enrollment").select("*"),
+        supabase.from("Session").select("*"),
+        supabase.from("AttendanceRecord").select("*"),
+      ]);
+
+      const students = studentsRes.data || [];
+      const enrollments = enrollmentsRes.data || [];
+      const sessions = sessionsRes.data || [];
+      const records = recordsRes.data || [];
 
       for (const s of students) {
+        const studentEnrollments = enrollments.filter((en: any) => en.student_id === s.id);
         let totalPossible = 0;
         let totalAttended = 0;
 
-        for (const en of s.enrollments) {
-          const sessionsCount = en.course.sessions.length;
-          totalPossible += sessionsCount;
+        for (const en of studentEnrollments) {
+          const courseSessions = sessions.filter((sess: any) => sess.course_id === en.course_id);
+          totalPossible += courseSessions.length;
+          const sessionIds = new Set(courseSessions.map((sess: any) => sess.id));
 
-          const attended = await prisma.attendanceRecord.count({
-            where: {
-              student_id: s.id,
-              session: { course_id: en.course_id },
-              status: { in: ["PRESENT", "LATE", "EXCUSED"] },
-            },
-          });
+          const attended = records.filter(
+            (r: any) =>
+              r.student_id === s.id &&
+              sessionIds.has(r.session_id) &&
+              (r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED")
+          ).length;
           totalAttended += attended;
         }
 
@@ -136,7 +163,7 @@ export async function GET(req: NextRequest) {
           "Matric Number": s.matric_number,
           "Full Name": s.full_name,
           "Level": s.level,
-          "Courses Enrolled": s.enrollments.length,
+          "Courses Enrolled": studentEnrollments.length,
           "Overall Attendance (%)": `${rate}%`,
           "Status": rate < 70 ? "AT RISK" : rate < 75 ? "WARNING" : "NORMAL",
         });
@@ -145,30 +172,43 @@ export async function GET(req: NextRequest) {
 
     // 4. PRINTABLE SESSION SIGN-IN SHEET DATA
     else if (reportType === "session-sheet" && sessionId) {
-      const session = await prisma.session.findUnique({
-        where: { id: sessionId },
-        include: {
-          course: {
-            include: { enrollments: { include: { student: true } } },
-          },
-          lecturer: true,
-          attendance_records: true,
-        },
-      });
+      const { data: session } = await supabase
+        .from("Session")
+        .select(`
+          *,
+          course:Course(*),
+          lecturer:User(name)
+        `)
+        .eq("id", sessionId)
+        .maybeSingle();
 
       if (!session) {
         return NextResponse.json({ error: "Session not found" }, { status: 404 });
       }
 
-      filename = `FUOYE_${session.course.course_code}_Session_SignIn_Sheet`;
+      filename = `FUOYE_${session.course?.course_code}_Session_SignIn_Sheet`;
 
+      const [enrollmentsRes, recordsRes] = await Promise.all([
+        supabase
+          .from("Enrollment")
+          .select("*, student:StudentProfile(*)")
+          .eq("course_id", session.course_id),
+        supabase
+          .from("AttendanceRecord")
+          .select("*")
+          .eq("session_id", sessionId),
+      ]);
+
+      const enrollments = enrollmentsRes.data || [];
+      const records = recordsRes.data || [];
       const recordMap = new Map();
-      session.attendance_records.forEach((r) => {
+      records.forEach((r: any) => {
         recordMap.set(r.matric_number, r);
       });
 
-      for (const en of session.course.enrollments) {
+      for (const en of enrollments) {
         const student = en.student;
+        if (!student) continue;
         const rec = recordMap.get(student.matric_number);
 
         rows.push({
@@ -178,18 +218,19 @@ export async function GET(req: NextRequest) {
           "Clock-In Time": rec ? new Date(rec.clock_in_time).toLocaleTimeString() : "DID NOT CLOCK IN",
           "Status": rec ? rec.status : "ABSENT",
           "Verification Token": rec ? rec.attendance_token : "N/A",
-          "Physical Signature": "", // Blank for physical signature
+          "Physical Signature": "",
         });
       }
 
       if (format === "json") {
+        const lecturerData = Array.isArray(session.lecturer) ? session.lecturer[0] : session.lecturer;
         return NextResponse.json({
           sessionInfo: {
-            courseCode: session.course.course_code,
-            courseTitle: session.course.course_title,
-            units: session.course.units,
-            level: session.course.level,
-            lecturerName: session.lecturer.name,
+            courseCode: session.course?.course_code,
+            courseTitle: session.course?.course_title,
+            units: session.course?.units,
+            level: session.course?.level,
+            lecturerName: lecturerData?.name || "Lecturer",
             date: new Date(session.opened_at).toLocaleDateString("en-NG", {
               weekday: "long",
               year: "numeric",

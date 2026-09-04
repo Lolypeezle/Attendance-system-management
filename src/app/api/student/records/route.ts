@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    
+    const { searchParams } = new URL(req.url);
+    const matricParam = searchParams.get("matric");
+
     // Students are not permitted to inspect attendance history
     if (user?.role === "STUDENT") {
       return NextResponse.json(
@@ -16,88 +18,112 @@ export async function GET(req: NextRequest) {
       );
     }
 
-      studentProfile = await prisma.studentProfile.findUnique({
-        where: { id: user.studentId },
-        include: {
-          enrollments: {
-            include: { course: { include: { lecturer: true } } },
-          },
-        },
-      });
+    let studentProfile: any = null;
+
+    if (user?.studentId) {
+      const { data } = await supabase
+        .from("StudentProfile")
+        .select(`
+          id, full_name, matric_number, level, email,
+          enrollments:Enrollment(
+            course_id,
+            course:Course(id, course_code, course_title, units, lecturer:User(id, name))
+          )
+        `)
+        .eq("id", user.studentId)
+        .maybeSingle();
+      studentProfile = data;
     } else if (matricParam) {
-      studentProfile = await prisma.studentProfile.findUnique({
-        where: { matric_number: matricParam.trim().toUpperCase() },
-        include: {
-          enrollments: {
-            include: { course: { include: { lecturer: true } } },
-          },
-        },
-      });
+      const { data } = await supabase
+        .from("StudentProfile")
+        .select(`
+          id, full_name, matric_number, level, email,
+          enrollments:Enrollment(
+            course_id,
+            course:Course(id, course_code, course_title, units, lecturer:User(id, name))
+          )
+        `)
+        .eq("matric_number", matricParam.trim().toUpperCase())
+        .maybeSingle();
+      studentProfile = data;
     } else if (user) {
-      // Default to first student in db if testing as admin/lecturer without studentId
-      studentProfile = await prisma.studentProfile.findFirst({
-        include: {
-          enrollments: {
-            include: { course: { include: { lecturer: true } } },
-          },
-        },
-      });
+      const { data } = await supabase
+        .from("StudentProfile")
+        .select(`
+          id, full_name, matric_number, level, email,
+          enrollments:Enrollment(
+            course_id,
+            course:Course(id, course_code, course_title, units, lecturer:User(id, name))
+          )
+        `)
+        .limit(1)
+        .maybeSingle();
+      studentProfile = data;
     }
 
     if (!studentProfile) {
       return NextResponse.json({ error: "Student profile not found." }, { status: 404 });
     }
 
-    // Fetch all attendance records for this student
-    const attendanceRecords = await prisma.attendanceRecord.findMany({
-      where: { student_id: studentProfile.id },
-      include: {
-        session: {
-          include: {
-            course: true,
-            lecturer: { select: { name: true } },
-          },
-        },
-      },
-      orderBy: { clock_in_time: "desc" },
-    });
+    // Fetch all attendance records for this student from Supabase
+    const { data: attendanceRecordsData } = await supabase
+      .from("AttendanceRecord")
+      .select(`
+        id, session_id, student_id, matric_number, full_name, status,
+        clock_in_time, attendance_token, is_flagged, flag_reason, notes,
+        session:Session(
+          course_id,
+          course:Course(id, course_code, course_title),
+          lecturer:User(name)
+        )
+      `)
+      .eq("student_id", studentProfile.id)
+      .order("clock_in_time", { ascending: false });
 
-    // Fetch student excuses
-    const excuses = await prisma.excuseRequest.findMany({
-      where: { student_id: studentProfile.id },
-      include: {
-        session: { include: { course: true } },
-      },
-      orderBy: { created_at: "desc" },
-    });
+    const attendanceRecords = attendanceRecordsData || [];
+
+    // Fetch excuses from Supabase
+    const { data: excusesData } = await supabase
+      .from("ExcuseRequest")
+      .select(`
+        id, session_id, reason, status, document_url, reviewer_notes, created_at,
+        session:Session(course:Course(course_code))
+      `)
+      .eq("student_id", studentProfile.id)
+      .order("created_at", { ascending: false });
+
+    const excuses = excusesData || [];
+    const enrollments = Array.isArray(studentProfile.enrollments) ? studentProfile.enrollments : [];
 
     // Calculate per-course statistics
     const courseStats = await Promise.all(
-      studentProfile.enrollments.map(async (en: any) => {
-        const totalSessions = await prisma.session.count({
-          where: { course_id: en.course_id },
-        });
+      enrollments.map(async (en: any) => {
+        const { count: sessionCount } = await supabase
+          .from("Session")
+          .select("id", { count: "exact", head: true })
+          .eq("course_id", en.course_id);
 
+        const totalSessions = sessionCount || 0;
         const studentRecordsForCourse = attendanceRecords.filter(
-          (rec) => rec.session.course_id === en.course_id
+          (rec: any) => rec.session?.course_id === en.course_id
         );
 
         const presentCount = studentRecordsForCourse.filter(
-          (r) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
+          (r: any) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
         ).length;
 
-        const lateCount = studentRecordsForCourse.filter((r) => r.status === "LATE").length;
+        const lateCount = studentRecordsForCourse.filter((r: any) => r.status === "LATE").length;
         const absentCount = totalSessions - presentCount;
 
         const percentage =
           totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 100;
 
         return {
-          courseId: en.course.id,
-          courseCode: en.course.course_code,
-          courseTitle: en.course.course_title,
-          units: en.course.units,
-          lecturerName: en.course.lecturer?.name || "Unassigned",
+          courseId: en.course?.id,
+          courseCode: en.course?.course_code,
+          courseTitle: en.course?.course_title,
+          units: en.course?.units,
+          lecturerName: en.course?.lecturer?.name || "Unassigned",
           totalSessions,
           attendedSessions: presentCount,
           lateSessions: lateCount,
@@ -127,20 +153,20 @@ export async function GET(req: NextRequest) {
       },
       overallRate,
       courseStats,
-      attendanceRecords: attendanceRecords.map((r) => ({
+      attendanceRecords: attendanceRecords.map((r: any) => ({
         id: r.id,
         sessionId: r.session_id,
-        courseCode: r.session.course.course_code,
-        courseTitle: r.session.course.course_title,
-        lecturerName: r.session.lecturer.name,
+        courseCode: r.session?.course?.course_code,
+        courseTitle: r.session?.course?.course_title,
+        lecturerName: r.session?.lecturer?.name,
         clockInTime: r.clock_in_time,
         status: r.status,
         attendanceToken: r.attendance_token,
         isFlagged: r.is_flagged,
       })),
-      excuses: excuses.map((e) => ({
+      excuses: excuses.map((e: any) => ({
         id: e.id,
-        courseCode: e.session.course.course_code,
+        courseCode: e.session?.course?.course_code,
         reason: e.reason,
         status: e.status,
         documentUrl: e.document_url,
@@ -148,7 +174,7 @@ export async function GET(req: NextRequest) {
         createdAt: e.created_at,
       })),
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Student desk error:", error);
     return NextResponse.json({ error: "Failed to fetch student data." }, { status: 500 });
   }

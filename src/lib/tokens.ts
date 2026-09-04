@@ -55,4 +55,61 @@ export function verifySessionQrToken(sessionId: string, token: string): boolean 
 
   return crypto.timingSafeEqual(provBuffer, expBuffer);
 }
+export const ATTENDANCE_WINDOW_MINUTES = 20;
 
+/**
+ * Calculates the 20-minute expiration timestamp (in milliseconds) from session start
+ */
+export function getSessionQrExpiry(openedAt: string | Date | number): number {
+  const startTimeMs =
+    typeof openedAt === "number"
+      ? openedAt
+      : new Date(openedAt).getTime();
+  return startTimeMs + ATTENDANCE_WINDOW_MINUTES * 60 * 1000;
+}
+
+/**
+ * Checks if the 20-minute window from class start has expired
+ */
+export function isSessionAttendanceExpired(openedAt: string | Date | number): boolean {
+  return Date.now() > getSessionQrExpiry(openedAt);
+}
+
+/**
+ * Returns remaining seconds in the 20-minute window (0 if expired)
+ */
+export function getRemainingExpirySeconds(openedAt: string | Date | number): number {
+  const diffMs = getSessionQrExpiry(openedAt) - Date.now();
+  return Math.max(0, Math.floor(diffMs / 1000));
+}
+
+const MEMORABLE_WORDS = [
+  "ALGORITHM",
+  "SPECTRUM",
+  "NEURON",
+  "VECTOR",
+  "SYNAPSE",
+  "KINETIC",
+  "CIPHER",
+  "QUANTUM",
+  "NEXUS",
+  "BINARY",
+  "CIRCUIT",
+  "DYNAMICS",
+  "PRISM",
+  "MATRIX",
+  "OASIS",
+  "HORIZON",
+  "APEX",
+  "CRYPTO",
+  "SUMMIT",
+  "LOGIC",
+];
+
+/**
+ * Generates an engaging, easy-to-announce unique word for the lecture session
+ */
+export function generateRandomSecretWord(): string {
+  const index = Math.floor(Math.random() * MEMORABLE_WORDS.length);
+  return MEMORABLE_WORDS[index];
+}

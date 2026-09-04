@@ -17,6 +17,7 @@ import {
   KeyRound,
 } from "lucide-react";
 import { getBrowserFingerprint } from "@/lib/fingerprint";
+import { getRemainingExpirySeconds, isSessionAttendanceExpired } from "@/lib/tokens";
 
 const DEFAULT_300L_COURSES = [
   { id: "crs_302", course_code: "CSC 302", course_title: "Object-Oriented Programming & Systems" },
@@ -41,12 +42,13 @@ function ClockInForm() {
   const [selectedCourseOrSession, setSelectedCourseOrSession] = useState<string>(urlSessionId || "crs_302");
   const [matricNumber, setMatricNumber] = useState<string>("");
   const [fullName, setFullName] = useState<string>("");
-  const [secretWord, setSecretWord] = useState<string>(urlQrToken || "");
+  const [secretWord, setSecretWord] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [fingerprint, setFingerprint] = useState<string>("");
   const [location, setLocation] = useState<{ lat?: number; lng?: number } | null>(null);
-
+  const [remainingSecs, setRemainingSecs] = useState<number | null>(null);
+  const [isWindowExpired, setIsWindowExpired] = useState(false);
 
   const [currentTime, setCurrentTime] = useState<string>("");
 
@@ -67,10 +69,8 @@ function ClockInForm() {
     return () => clearInterval(timer);
   }, []);
 
-
   useEffect(() => {
     getBrowserFingerprint().then((fp) => setFingerprint(fp));
-
 
     // Fetch active sessions and courses
     Promise.all([
@@ -100,6 +100,28 @@ function ClockInForm() {
     }
   }, [urlSessionId]);
 
+  // Track 20-minute expiry countdown
+  useEffect(() => {
+    const currentSession = activeSessions.find(
+      (s) => s.id === selectedCourseOrSession || s.course_id === selectedCourseOrSession
+    );
+
+    if (currentSession?.opened_at) {
+      const updateTimer = () => {
+        const secs = getRemainingExpirySeconds(currentSession.opened_at);
+        setRemainingSecs(secs);
+        setIsWindowExpired(secs <= 0);
+      };
+
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setRemainingSecs(null);
+      setIsWindowExpired(false);
+    }
+  }, [selectedCourseOrSession, activeSessions]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -108,6 +130,14 @@ function ClockInForm() {
       setErrorMessage("Please select a course for class attendance.");
       return;
     }
+
+    if (!urlQrToken) {
+      setErrorMessage(
+        "In-Class QR Code Scan Required! You must physically scan the active QR code displayed on your lecturer's phone. Entering the unique word alone without scanning is not permitted."
+      );
+      return;
+    }
+
     if (!matricNumber.trim()) {
       setErrorMessage("Please enter your matriculation number.");
       return;
@@ -117,7 +147,7 @@ function ClockInForm() {
       return;
     }
     if (!secretWord.trim()) {
-      setErrorMessage("Please enter the unique class secret word announced by the lecturer in class.");
+      setErrorMessage("Please enter the unique class word announced verbally by the lecturer in class.");
       return;
     }
 
@@ -132,9 +162,8 @@ function ClockInForm() {
         deviceFingerprint: fingerprint,
         latitude: location?.lat,
         longitude: location?.lng,
-        qrToken: urlQrToken || secretWord.trim().toUpperCase(),
+        qrToken: urlQrToken.trim(),
       };
-
 
       const res = await fetch("/api/clock-in", {
         method: "POST",
@@ -180,10 +209,47 @@ function ClockInForm() {
 
         {/* Clock-In Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-7 space-y-5">
-          {urlQrToken && (
-            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-fuoye-green text-xs font-semibold">
-              <QrCode className="w-4 h-4 shrink-0" />
-              <span>Verified Class Session Token Attached</span>
+          {urlQrToken ? (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-fuoye-green text-xs font-semibold">
+              <QrCode className="w-4 h-4 shrink-0 text-fuoye-green" />
+              <div>
+                <span className="font-bold block">In-Class QR Code Verified</span>
+                <span className="text-[10px] text-emerald-800 block">
+                  Scanned from lecturer&apos;s screen. Enter the Class Unique Word announced in class to complete attendance.
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <span className="font-bold block text-amber-950">In-Class QR Code Scan Required</span>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  You must physically scan the QR code from the lecturer&apos;s phone to clock in. If someone texted you the unique word, you will not be clocked in by the system because the in-class QR code must be scanned too.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {remainingSecs !== null && (
+            <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
+              isWindowExpired
+                ? "bg-rose-50 border-rose-300 text-rose-800"
+                : remainingSecs < 180
+                ? "bg-rose-50 border-rose-300 text-rose-800 animate-pulse"
+                : remainingSecs < 600
+                ? "bg-amber-50 border-amber-300 text-amber-900"
+                : "bg-emerald-50 border-emerald-300 text-emerald-900"
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>20-Minute Window:</span>
+              </div>
+              <span className="font-mono font-black text-sm tracking-wider">
+                {isWindowExpired
+                  ? "EXPIRED (LOCKED)"
+                  : `${Math.floor(remainingSecs / 60)}:${(remainingSecs % 60).toString().padStart(2, "0")} remaining`}
+              </span>
             </div>
           )}
 
@@ -249,7 +315,7 @@ function ClockInForm() {
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="e.g. CSC/2022/1001"
+                  placeholder="e.g. CSC/2023/1001"
                   value={matricNumber}
                   onChange={(e) => setMatricNumber(e.target.value.toUpperCase())}
                   required
@@ -258,7 +324,7 @@ function ClockInForm() {
                 <Hash className="w-4 h-4 text-slate-400 absolute left-3 top-3.5" />
               </div>
               <p className="text-[11px] text-slate-400">
-                All 300L matriculation numbers are accepted.
+                All 300L matriculation numbers (e.g. CSC/2023/...) are accepted.
               </p>
             </div>
 
@@ -283,12 +349,12 @@ function ClockInForm() {
             {/* Unique Class Attendance Secret Word */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Class Attendance Secret Word <span className="text-rose-500">*</span>
+                Class Attendance Unique Word <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
-                  placeholder="Enter secret word announced in class..."
+                  placeholder="Enter unique word announced in class..."
                   value={secretWord}
                   onChange={(e) => setSecretWord(e.target.value.toUpperCase())}
                   required
@@ -297,22 +363,31 @@ function ClockInForm() {
                 <KeyRound className="w-4 h-4 text-purple-600 absolute left-3 top-3.5" />
               </div>
               <p className="text-[11px] text-slate-500 italic">
-                Only students physically attending the lecture will receive this unique word from the lecturer.
+                Only students physically attending the lecture receive this unique word from the lecturer.
               </p>
             </div>
 
-            {/* Submit Button */}
+            {/* Strict Anti-Proxy Notice */}
+            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2 text-[11px] text-slate-600">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Single Device & IP Enforcement: Submissions from the same IP address for this lecture are blocked.</span>
+            </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
-              disabled={submitting}
-              className="w-full mt-2 py-3 px-4 bg-fuoye-green hover:bg-fuoye-green-light text-white font-bold rounded-xl text-xs transition-all shadow-md hover:shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              disabled={submitting || isWindowExpired}
+              className="w-full mt-2 py-3 px-4 bg-fuoye-green hover:bg-fuoye-green-light text-white font-bold rounded-xl text-xs transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Recording Attendance...</span>
+                  <span>Verifying & Clocking In...</span>
                 </>
+              ) : isWindowExpired ? (
+                <span>Attendance Closed (20m Window Expired)</span>
+              ) : !urlQrToken ? (
+                <span>Scan Lecturer QR Code to Clock In</span>
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 text-amber-300" />

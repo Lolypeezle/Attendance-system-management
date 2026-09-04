@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -13,25 +13,25 @@ export async function GET() {
     }
 
     const [
-      users,
-      students,
-      courses,
-      enrollments,
-      sessions,
-      attendance,
-      excuses,
-      auditLogs,
-      settings,
+      usersRes,
+      studentsRes,
+      coursesRes,
+      enrollmentsRes,
+      sessionsRes,
+      attendanceRes,
+      excusesRes,
+      auditLogsRes,
+      settingsRes,
     ] = await Promise.all([
-      prisma.user.findMany({ select: { id: true, name: true, email: true, role: true, is_active: true, created_at: true } }),
-      prisma.studentProfile.findMany(),
-      prisma.course.findMany(),
-      prisma.enrollment.findMany(),
-      prisma.session.findMany(),
-      prisma.attendanceRecord.findMany(),
-      prisma.excuseRequest.findMany(),
-      prisma.auditLog.findMany(),
-      prisma.systemSetting.findMany(),
+      supabase.from("User").select("id, name, email, role, is_active, created_at"),
+      supabase.from("StudentProfile").select("*"),
+      supabase.from("Course").select("*"),
+      supabase.from("Enrollment").select("*"),
+      supabase.from("Session").select("*"),
+      supabase.from("AttendanceRecord").select("*"),
+      supabase.from("ExcuseRequest").select("*"),
+      supabase.from("AuditLog").select("*"),
+      supabase.from("SystemSetting").select("*"),
     ]);
 
     const backupDump = {
@@ -41,15 +41,15 @@ export async function GET() {
       exportedAt: new Date().toISOString(),
       exportedBy: admin.name,
       data: {
-        users,
-        students,
-        courses,
-        enrollments,
-        sessions,
-        attendance,
-        excuses,
-        auditLogs,
-        settings,
+        users: usersRes.data || [],
+        students: studentsRes.data || [],
+        courses: coursesRes.data || [],
+        enrollments: enrollmentsRes.data || [],
+        sessions: sessionsRes.data || [],
+        attendance: attendanceRes.data || [],
+        excuses: excusesRes.data || [],
+        auditLogs: auditLogsRes.data || [],
+        settings: settingsRes.data || [],
       },
     };
 

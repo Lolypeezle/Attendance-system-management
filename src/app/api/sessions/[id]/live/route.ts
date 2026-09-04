@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
+import {
+  signSessionQrToken,
+  getSessionQrExpiry,
+  getRemainingExpirySeconds,
+  isSessionAttendanceExpired,
+  ATTENDANCE_WINDOW_MINUTES,
+} from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
 
@@ -10,57 +17,75 @@ export async function GET(
   try {
     const sessionId = params.id;
 
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: {
-        course: {
-          include: {
-            enrollments: {
-              include: { student: true },
-            },
-          },
-        },
-        lecturer: { select: { id: true, name: true, email: true } },
-      },
-    });
+    // Fetch Session from Supabase
+    const { data: session, error: sessionError } = await supabase
+      .from("Session")
+      .select(`
+        *,
+        course:Course(id, course_code, course_title, level),
+        lecturer:User(id, name, email)
+      `)
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (sessionError) {
+      console.error("Supabase fetch session error:", sessionError);
+      return NextResponse.json({ error: sessionError.message }, { status: 500 });
+    }
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    // Auto-close check
+    // Auto-close check if total session duration exceeded
     const elapsedMinutes = (Date.now() - new Date(session.opened_at).getTime()) / (1000 * 60);
     if (session.status === "OPEN" && elapsedMinutes > session.duration_minutes) {
-      await prisma.session.update({
-        where: { id: session.id },
-        data: { status: "CLOSED", closed_at: new Date() },
-      });
+      await supabase
+        .from("Session")
+        .update({ status: "CLOSED", closed_at: new Date().toISOString() })
+        .eq("id", session.id);
       session.status = "CLOSED";
     }
 
-    // Attendance records for this session
-    const records = await prisma.attendanceRecord.findMany({
-      where: { session_id: sessionId },
-      include: {
-        student: true,
-      },
-      orderBy: { clock_in_time: "desc" },
-    });
+    // Attendance records from Supabase
+    const { data: recordsData, error: recordsError } = await supabase
+      .from("AttendanceRecord")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("clock_in_time", { ascending: false });
 
-    const enrolledStudents = session.course.enrollments.map((e) => e.student);
+    if (recordsError) {
+      console.error("Supabase fetch records error:", recordsError);
+    }
+
+    const records = recordsData || [];
+
+    // Course Enrollments from Supabase
+    const { data: enrollmentsData, error: enrollmentsError } = await supabase
+      .from("Enrollment")
+      .select(`
+        student:StudentProfile(id, matric_number, full_name, level)
+      `)
+      .eq("course_id", session.course_id);
+
+    if (enrollmentsError) {
+      console.error("Supabase fetch enrollments error:", enrollmentsError);
+    }
+
+    const enrolledStudents = (enrollmentsData || [])
+      .map((e: any) => e.student)
+      .filter(Boolean);
+
     const totalEnrolled = enrolledStudents.length;
-
     const presentCount = records.filter((r) => r.status === "PRESENT").length;
     const lateCount = records.filter((r) => r.status === "LATE").length;
     const excusedCount = records.filter((r) => r.status === "EXCUSED").length;
     const flaggedCount = records.filter((r) => r.is_flagged).length;
 
-    // Clocked-in student IDs
-    const clockedInStudentIds = new Set(records.map((r) => r.student_id));
-
-    // Not yet clocked in
+    // Clocked-in students set
+    const clockedInMatrics = new Set(records.map((r) => r.matric_number));
     const unclockedStudents = enrolledStudents.filter(
-      (s) => !clockedInStudentIds.has(s.id)
+      (s: any) => !clockedInMatrics.has(s.matric_number)
     );
 
     const remainingMinutes = Math.max(
@@ -68,14 +93,30 @@ export async function GET(
       Math.round(session.duration_minutes - elapsedMinutes)
     );
 
+    // 20-Minute Attendance Window details
+    const expiryTimestamp = getSessionQrExpiry(session.opened_at);
+    const signedQrToken = signSessionQrToken(session.id, expiryTimestamp);
+    const remainingExpirySeconds = getRemainingExpirySeconds(session.opened_at);
+    const isAttendanceExpired = isSessionAttendanceExpired(session.opened_at);
+
+    // Extract clean secret word
+    const rawSecret = (session.qr_token || "").trim();
+    let secretWord = rawSecret;
+    if (rawSecret.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(rawSecret);
+        secretWord = parsed.secretWord || rawSecret;
+      } catch {}
+    }
+
     return NextResponse.json({
       session: {
         id: session.id,
-        courseId: session.course.id,
-        courseCode: session.course.course_code,
-        courseTitle: session.course.course_title,
-        level: session.course.level,
-        lecturerName: session.lecturer.name,
+        courseId: session.course?.id || session.course_id,
+        courseCode: session.course?.course_code,
+        courseTitle: session.course?.course_title,
+        level: session.course?.level,
+        lecturerName: session.lecturer?.name || "Lecturer",
         openedAt: session.opened_at,
         closedAt: session.closed_at,
         durationMinutes: session.duration_minutes,
@@ -83,8 +124,14 @@ export async function GET(
         requireQr: session.require_qr,
         requireGeo: session.require_geo,
         qrToken: session.qr_token,
-        status: session.status,
+        secretWord: secretWord.toUpperCase(),
+        signedQrToken,
         remainingMinutes,
+        remainingExpirySeconds,
+        isAttendanceExpired,
+        expiryTimestamp,
+        attendanceWindowMinutes: ATTENDANCE_WINDOW_MINUTES,
+        status: session.status,
       },
       stats: {
         totalEnrolled,
@@ -109,15 +156,18 @@ export async function GET(
         flagReason: r.flag_reason,
         notes: r.notes,
       })),
-      unclockedStudents: unclockedStudents.map((s) => ({
+      unclockedStudents: unclockedStudents.map((s: any) => ({
         id: s.id,
         matricNumber: s.matric_number,
         fullName: s.full_name,
         level: s.level,
       })),
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Live session fetch error:", error);
-    return NextResponse.json({ error: "Failed to fetch live session data" }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch live session data" },
+      { status: 500 }
+    );
   }
 }

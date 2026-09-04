@@ -1,8 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import {
+  signSessionQrToken,
+  getSessionQrExpiry,
+  getRemainingExpirySeconds,
+  isSessionAttendanceExpired,
+} from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
+
+function enrichSession(s: any) {
+  if (!s) return s;
+  const openedAt = s.opened_at || s.created_at || new Date().toISOString();
+  const expiryTimestamp = getSessionQrExpiry(openedAt);
+  const signedQrToken = signSessionQrToken(s.id, expiryTimestamp);
+  const remainingSeconds = getRemainingExpirySeconds(openedAt);
+  const isExpired = isSessionAttendanceExpired(openedAt);
+  const rawSecret = (s.qr_token || "").trim();
+  let secretWord = rawSecret;
+  if (rawSecret.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(rawSecret);
+      secretWord = parsed.secretWord || rawSecret;
+    } catch {}
+  }
+
+  return {
+    ...s,
+    secretWord: secretWord.toUpperCase(),
+    signedQrToken,
+    remainingSeconds,
+    isExpired,
+    expiryTimestamp,
+  };
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -37,7 +69,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ sessions: sessions || [] });
+    const enriched = (sessions || []).map(enrichSession);
+    return NextResponse.json({ sessions: enriched });
   } catch (error) {
     console.error("Fetch sessions error:", error);
     return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 });
@@ -47,7 +80,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN" && user.role !== "ADMIN")) {
+    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN")) {
       return NextResponse.json({ error: "Unauthorized. Admin or Lecturer access required." }, { status: 403 });
     }
 
@@ -106,7 +139,7 @@ export async function POST(req: NextRequest) {
         .single();
 
       if (updateError) throw updateError;
-      return NextResponse.json({ success: true, session: updated, updated: true });
+      return NextResponse.json({ success: true, session: enrichSession(updated), updated: true });
     }
 
     // Insert new scheduled session
@@ -134,7 +167,7 @@ export async function POST(req: NextRequest) {
       throw insertError;
     }
 
-    return NextResponse.json({ success: true, session: newSession });
+    return NextResponse.json({ success: true, session: enrichSession(newSession) });
   } catch (error: any) {
     console.error("Create/update session error:", error);
     return NextResponse.json({ error: error.message || "Failed to schedule session" }, { status: 500 });
@@ -144,7 +177,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN" && user.role !== "ADMIN")) {
+    if (!user || (user.role !== "LECTURER" && user.role !== "HOD" && user.role !== "SUPERADMIN")) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
     }
 
@@ -166,7 +199,7 @@ export async function PATCH(req: NextRequest) {
         .single();
 
       if (error) throw error;
-      return NextResponse.json({ success: true, session: updated });
+      return NextResponse.json({ success: true, session: enrichSession(updated) });
     }
 
     if (action === "UPDATE_SECRET_WORD") {
@@ -180,11 +213,14 @@ export async function PATCH(req: NextRequest) {
           qr_token: secretWord.trim().toUpperCase(),
         })
         .eq("id", sessionId)
-        .select()
+        .select(`
+          *,
+          course:Course(id, course_code, course_title, level)
+        `)
         .single();
 
       if (error) throw error;
-      return NextResponse.json({ success: true, session: updated });
+      return NextResponse.json({ success: true, session: enrichSession(updated) });
     }
 
     return NextResponse.json({ error: "Unsupported session action" }, { status: 400 });

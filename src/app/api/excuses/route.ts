@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
 import { AttendanceStatus, ExcuseStatus } from "@/lib/types";
 
@@ -13,41 +13,46 @@ export async function GET(req: NextRequest) {
     const statusParam = searchParams.get("status") as ExcuseStatus | null;
     const courseIdParam = searchParams.get("courseId");
 
-    const whereClause: any = {};
-    if (statusParam) whereClause.status = statusParam;
+    let query = supabase
+      .from("ExcuseRequest")
+      .select(`
+        *,
+        student:StudentProfile(*),
+        session:Session(*, course:Course(*), lecturer:User(name)),
+        reviewer:User(name)
+      `)
+      .order("created_at", { ascending: false });
+
+    if (statusParam) {
+      query = query.eq("status", statusParam);
+    }
+
+    if (user?.role === "STUDENT" && user.studentId) {
+      query = query.eq("student_id", user.studentId);
+    }
+
+    const { data: excuses, error } = await query;
+
+    if (error) {
+      console.error("Supabase excuses error:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    let filtered = excuses || [];
 
     if (user?.role === "LECTURER") {
-      // Show excuses for courses taught by lecturer
-      whereClause.session = {
-        course: { lecturer_id: user.userId },
-      };
-    } else if (user?.role === "STUDENT" && user.studentId) {
-      whereClause.student_id = user.studentId;
+      filtered = filtered.filter(
+        (ex: any) => ex.session?.course?.lecturer_id === user.userId
+      );
     }
 
     if (courseIdParam) {
-      whereClause.session = {
-        ...(whereClause.session || {}),
-        course_id: courseIdParam,
-      };
+      filtered = filtered.filter(
+        (ex: any) => ex.session?.course_id === courseIdParam
+      );
     }
 
-    const excuses = await prisma.excuseRequest.findMany({
-      where: whereClause,
-      include: {
-        student: true,
-        session: {
-          include: {
-            course: true,
-            lecturer: { select: { name: true } },
-          },
-        },
-        reviewer: { select: { name: true } },
-      },
-      orderBy: { created_at: "desc" },
-    });
-
-    return NextResponse.json({ excuses });
+    return NextResponse.json({ excuses: filtered });
   } catch (error) {
     console.error("Fetch excuses error:", error);
     return NextResponse.json({ error: "Failed to fetch excuse requests" }, { status: 500 });
@@ -68,9 +73,12 @@ export async function POST(req: NextRequest) {
 
     let studentId = user?.studentId;
     if (!studentId && matricNumber) {
-      const student = await prisma.studentProfile.findUnique({
-        where: { matric_number: matricNumber.trim().toUpperCase() },
-      });
+      const cleanMatric = matricNumber.trim().toUpperCase().replace(/\s*\/\s*/g, "/");
+      const { data: student } = await supabase
+        .from("StudentProfile")
+        .select("id")
+        .eq("matric_number", cleanMatric)
+        .maybeSingle();
       if (student) studentId = student.id;
     }
 
@@ -81,27 +89,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const excuse = await prisma.excuseRequest.create({
-      data: {
+    const { data: excuse, error: insertError } = await supabase
+      .from("ExcuseRequest")
+      .insert({
         student_id: studentId,
         session_id: sessionId,
         reason: reason.trim(),
         document_url: documentUrl?.trim() || null,
         status: ExcuseStatus.PENDING,
-      },
-      include: {
-        student: true,
-        session: { include: { course: true } },
-      },
-    });
+      })
+      .select(`
+        *,
+        student:StudentProfile(*),
+        session:Session(*, course:Course(*))
+      `)
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    }
 
     await logAudit({
       actorId: user?.userId,
-      actorName: user?.name || excuse.student.full_name,
+      actorName: user?.name || excuse?.student?.full_name || "Student",
       action: "EXCUSE_SUBMITTED",
       entityType: "ExcuseRequest",
-      entityId: excuse.id,
-      newValue: { course: excuse.session.course.course_code, reason },
+      entityId: excuse?.id,
+      newValue: { course: excuse?.session?.course?.course_code, reason },
     });
 
     return NextResponse.json({ success: true, excuse });
@@ -124,10 +138,15 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Invalid excuse review parameters." }, { status: 400 });
     }
 
-    const excuse = await prisma.excuseRequest.findUnique({
-      where: { id: excuseId },
-      include: { student: true, session: { include: { course: true } } },
-    });
+    const { data: excuse } = await supabase
+      .from("ExcuseRequest")
+      .select(`
+        *,
+        student:StudentProfile(*),
+        session:Session(*, course:Course(*))
+      `)
+      .eq("id", excuseId)
+      .maybeSingle();
 
     if (!excuse) {
       return NextResponse.json({ error: "Excuse request not found." }, { status: 404 });
@@ -136,39 +155,51 @@ export async function PATCH(req: NextRequest) {
     const oldStatus = excuse.status;
 
     // Update Excuse status
-    const updatedExcuse = await prisma.excuseRequest.update({
-      where: { id: excuseId },
-      data: {
+    const { data: updatedExcuse, error: updateErr } = await supabase
+      .from("ExcuseRequest")
+      .update({
         status: status as ExcuseStatus,
         reviewed_by: user.userId,
-        reviewed_at: new Date(),
+        reviewed_at: new Date().toISOString(),
         reviewer_notes: reviewerNotes?.trim() || null,
-      },
-    });
+      })
+      .eq("id", excuseId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
 
     // If approved, update or create AttendanceRecord marked as EXCUSED
-    if (status === "APPROVED") {
-      await prisma.attendanceRecord.upsert({
-        where: {
-          session_id_matric_number: {
-            session_id: excuse.session_id,
-            matric_number: excuse.student.matric_number,
-          },
-        },
-        update: {
-          status: AttendanceStatus.EXCUSED,
-          notes: `Excuse approved by ${user.name}: ${reviewerNotes || "Approved medical/official excuse"}`,
-        },
-        create: {
+    if (status === "APPROVED" && excuse.student) {
+      const studentMatric = excuse.student.matric_number;
+      const { data: existingRec } = await supabase
+        .from("AttendanceRecord")
+        .select("id")
+        .eq("session_id", excuse.session_id)
+        .eq("matric_number", studentMatric)
+        .maybeSingle();
+
+      if (existingRec) {
+        await supabase
+          .from("AttendanceRecord")
+          .update({
+            status: AttendanceStatus.EXCUSED,
+            notes: `Excuse approved by ${user.name}: ${reviewerNotes || "Approved medical/official excuse"}`,
+          })
+          .eq("id", existingRec.id);
+      } else {
+        await supabase.from("AttendanceRecord").insert({
           session_id: excuse.session_id,
           student_id: excuse.student_id,
-          matric_number: excuse.student.matric_number,
+          matric_number: studentMatric,
           full_name: excuse.student.full_name,
           status: AttendanceStatus.EXCUSED,
           attendance_token: "EXCUSED",
           notes: `Excuse approved by ${user.name}: ${reviewerNotes || "Approved medical/official excuse"}`,
-        },
-      });
+        });
+      }
     }
 
     await logAudit({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -25,47 +25,70 @@ export async function POST(req: NextRequest) {
     if (type === "students") {
       for (let i = 0; i < records.length; i++) {
         const row = records[i];
-        const matric = (row.matric_number || row["Matric Number"] || row.matric || "").trim().toUpperCase();
+        const rawMatric = (row.matric_number || row["Matric Number"] || row.matric || "").trim();
         const fullName = (row.full_name || row["Full Name"] || row.name || "").trim();
-        const level = (row.level || row["Level"] || "100L").trim().toUpperCase();
+        const level = (row.level || row["Level"] || "300L").trim().toUpperCase();
         const coursesStr = (row.courses_enrolled || row["Courses Enrolled"] || row.courses || "").trim();
 
-        if (!matric || !fullName) {
+        if (!rawMatric || !fullName) {
           errors.push(`Row ${i + 1}: Missing matric number or name`);
           continue;
         }
 
+        const matric = rawMatric.toUpperCase().replace(/\s*\/\s*/g, "/");
+
         try {
-          const profile = await prisma.studentProfile.upsert({
-            where: { matric_number: matric },
-            update: { full_name: fullName, level },
-            create: {
-              matric_number: matric,
-              full_name: fullName,
-              level,
-            },
-          });
+          let { data: profile } = await supabase
+            .from("StudentProfile")
+            .select("id")
+            .eq("matric_number", matric)
+            .maybeSingle();
+
+          if (profile) {
+            await supabase
+              .from("StudentProfile")
+              .update({ full_name: fullName, level })
+              .eq("id", profile.id);
+          } else {
+            const { data: newProfile } = await supabase
+              .from("StudentProfile")
+              .insert({
+                matric_number: matric,
+                full_name: fullName,
+                level,
+              })
+              .select("id")
+              .single();
+            profile = newProfile;
+          }
 
           // Enroll in courses if specified
-          if (coursesStr) {
+          if (coursesStr && profile) {
             const courseCodes = coursesStr.split(/[,;|]/).map((c: string) => c.trim().toUpperCase());
             for (const cCode of courseCodes) {
               if (!cCode) continue;
-              const course = await prisma.course.findUnique({ where: { course_code: cCode } });
+              const { data: course } = await supabase
+                .from("Course")
+                .select("id")
+                .eq("course_code", cCode)
+                .maybeSingle();
+
               if (course) {
-                await prisma.enrollment.upsert({
-                  where: {
-                    student_id_course_id: {
-                      student_id: profile.id,
-                      course_id: course.id,
-                    },
-                  },
-                  update: {},
-                  create: {
+                const { data: existingEn } = await supabase
+                  .from("Enrollment")
+                  .select("id")
+                  .eq("student_id", profile.id)
+                  .eq("course_id", course.id)
+                  .maybeSingle();
+
+                if (!existingEn) {
+                  await supabase.from("Enrollment").insert({
                     student_id: profile.id,
                     course_id: course.id,
-                  },
-                });
+                    academic_session: "2025/2026",
+                    semester: "SECOND",
+                  });
+                }
               }
             }
           }
@@ -91,7 +114,7 @@ export async function POST(req: NextRequest) {
         const code = (row.course_code || row["Course Code"] || row.code || "").trim().toUpperCase();
         const title = (row.course_title || row["Course Title"] || row.title || "").trim();
         const units = parseInt(row.units || row["Units"] || "3", 10);
-        const level = (row.level || row["Level"] || "100L").trim().toUpperCase();
+        const level = (row.level || row["Level"] || "300L").trim().toUpperCase();
         const lecturerEmail = (row.lecturer_email || row["Lecturer Email"] || "").trim().toLowerCase();
 
         if (!code || !title) {
@@ -102,21 +125,39 @@ export async function POST(req: NextRequest) {
         try {
           let lecturerId: string | null = null;
           if (lecturerEmail) {
-            const lecturerUser = await prisma.user.findUnique({ where: { email: lecturerEmail } });
+            const { data: lecturerUser } = await supabase
+              .from("User")
+              .select("id")
+              .eq("email", lecturerEmail)
+              .maybeSingle();
             if (lecturerUser) lecturerId = lecturerUser.id;
           }
 
-          await prisma.course.upsert({
-            where: { course_code: code },
-            update: { course_title: title, units, level, lecturer_id: lecturerId },
-            create: {
+          const { data: existingCourse } = await supabase
+            .from("Course")
+            .select("id")
+            .eq("course_code", code)
+            .maybeSingle();
+
+          if (existingCourse) {
+            await supabase
+              .from("Course")
+              .update({
+                course_title: title,
+                units,
+                level,
+                lecturer_id: lecturerId,
+              })
+              .eq("id", existingCourse.id);
+          } else {
+            await supabase.from("Course").insert({
               course_code: code,
               course_title: title,
               units,
               level,
               lecturer_id: lecturerId,
-            },
-          });
+            });
+          }
           insertedCount++;
         } catch (err: any) {
           errors.push(`Row ${i + 1} (${code}): ${err.message}`);

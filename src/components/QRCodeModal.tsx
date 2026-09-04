@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Maximize2, Minimize2, Copy, Check, QrCode } from "lucide-react";
+import { X, Maximize2, Minimize2, Copy, Check, QrCode, Clock, KeyRound, ShieldAlert } from "lucide-react";
 import QRCode from "qrcode";
+import { getRemainingExpirySeconds, isSessionAttendanceExpired } from "@/lib/tokens";
 
 interface QRCodeModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface QRCodeModalProps {
     courseCode: string;
     courseTitle: string;
     qrToken: string;
+    secretWord?: string;
+    openedAt?: string | Date;
     lecturerName: string;
   };
 }
@@ -20,11 +23,23 @@ export function QRCodeModal({ isOpen, onClose, session }: QRCodeModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [remainingSecs, setRemainingSecs] = useState<number>(() =>
+    session.openedAt ? getRemainingExpirySeconds(session.openedAt) : 1200
+  );
 
   const clockInUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/clock-in?session=${session.id}&token=${session.qrToken}`
       : "";
+
+  useEffect(() => {
+    if (!isOpen || !session.openedAt) return;
+    setRemainingSecs(getRemainingExpirySeconds(session.openedAt));
+    const timer = setInterval(() => {
+      setRemainingSecs(getRemainingExpirySeconds(session.openedAt!));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isOpen, session.openedAt]);
 
   useEffect(() => {
     if (isOpen && clockInUrl) {
@@ -53,6 +68,10 @@ export function QRCodeModal({ isOpen, onClose, session }: QRCodeModalProps) {
     setIsFullscreen(!isFullscreen);
   };
 
+  const minutes = Math.floor(remainingSecs / 60);
+  const seconds = remainingSecs % 60;
+  const isExpired = remainingSecs <= 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div
@@ -67,12 +86,12 @@ export function QRCodeModal({ isOpen, onClose, session }: QRCodeModalProps) {
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider">
               <span className="w-2 h-2 rounded-full bg-emerald-600 animate-ping" />
-              Live Lecture Session
+              Lecturer Mobile & Projector Screen
             </div>
-            <h2 className="text-xl font-extrabold text-slate-900 mt-2">
+            <h2 className="text-xl font-black text-slate-900 mt-2">
               {session.courseCode}: {session.courseTitle}
             </h2>
-            <p className="text-xs text-slate-500">{session.lecturerName}</p>
+            <p className="text-xs text-slate-500">Lecturer: {session.lecturerName}</p>
           </div>
 
           <div className="flex items-center gap-1">
@@ -92,9 +111,48 @@ export function QRCodeModal({ isOpen, onClose, session }: QRCodeModalProps) {
           </div>
         </div>
 
+        {/* 20-Minute Expiry Countdown Bar */}
+        <div className={`mt-3 p-3 rounded-xl border flex items-center justify-between text-xs font-bold ${
+          isExpired
+            ? "bg-rose-50 border-rose-300 text-rose-800"
+            : remainingSecs < 180
+            ? "bg-rose-50 border-rose-300 text-rose-800 animate-pulse"
+            : remainingSecs < 600
+            ? "bg-amber-50 border-amber-300 text-amber-900"
+            : "bg-emerald-50 border-emerald-300 text-emerald-900"
+        }`}>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            <span>20-Minute Attendance Window:</span>
+          </div>
+          <span className="font-mono text-sm font-black tracking-wider">
+            {isExpired ? "EXPIRED (Locked)" : `${minutes}:${seconds.toString().padStart(2, "0")} remaining`}
+          </span>
+        </div>
+
+        {/* Class Unique Word Display */}
+        {session.secretWord && (
+          <div className="mt-2.5 p-3 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-4 h-4 text-purple-700" />
+              <div>
+                <span className="text-[10px] uppercase font-bold text-purple-600 block">Class Unique Word</span>
+                <span className="font-mono text-base font-black text-purple-950 tracking-widest">
+                  {session.secretWord}
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold text-purple-700 bg-white px-2 py-1 rounded-lg border border-purple-200">
+              Announce in class
+            </span>
+          </div>
+        )}
+
         {/* QR Code Container */}
-        <div className="my-6 flex flex-col items-center justify-center">
-          <div className="p-4 bg-white border-2 border-emerald-500 rounded-2xl shadow-lg inline-block">
+        <div className="my-4 flex flex-col items-center justify-center">
+          <div className={`p-4 bg-white border-2 rounded-2xl shadow-lg inline-block ${
+            isExpired ? "border-slate-300 opacity-60" : "border-emerald-500"
+          }`}>
             {qrDataUrl ? (
               <img
                 src={qrDataUrl}
@@ -109,13 +167,13 @@ export function QRCodeModal({ isOpen, onClose, session }: QRCodeModalProps) {
               </div>
             )}
           </div>
-          <p className="mt-3 text-xs font-semibold text-slate-600 text-center max-w-xs">
-            Scan this QR code with your mobile camera to clock in immediately
+          <p className="mt-2.5 text-xs font-semibold text-slate-600 text-center max-w-xs">
+            Students must scan this QR code with their mobile phone and enter the Unique Word
           </p>
         </div>
 
         {/* URL Sharing Bar */}
-        <div className="space-y-3">
+        <div className="space-y-2.5">
           <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-100 border border-slate-200">
             <input
               type="text"
@@ -132,8 +190,9 @@ export function QRCodeModal({ isOpen, onClose, session }: QRCodeModalProps) {
             </button>
           </div>
 
-          <div className="text-[11px] text-center text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 font-medium">
-            🔒 This signed QR code token will expire automatically when the session closes.
+          <div className="text-[11px] text-center text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-2 font-medium flex items-center justify-center gap-1.5">
+            <ShieldAlert className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Anti-Proxy: QR scan token, unique word, and single-IP validation enforced.</span>
           </div>
         </div>
       </div>

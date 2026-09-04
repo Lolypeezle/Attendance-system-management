@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
 import { AttendanceStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-// Mark unclocked students absent
+// Mark unclocked students absent using Supabase
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -18,46 +18,57 @@ export async function POST(
     }
 
     const sessionId = params.id;
-    const session = await prisma.session.findUnique({
-      where: { id: sessionId },
-      include: {
-        course: {
-          include: {
-            enrollments: { include: { student: true } },
-          },
-        },
-      },
-    });
 
-    if (!session) {
+    // Fetch session
+    const { data: session, error: sessionErr } = await supabase
+      .from("Session")
+      .select("id, course_id")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    if (sessionErr || !session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
-    const existingRecords = await prisma.attendanceRecord.findMany({
-      where: { session_id: sessionId },
-      select: { student_id: true },
-    });
+    // Fetch course enrollments
+    const { data: enrollments, error: enrollErr } = await supabase
+      .from("Enrollment")
+      .select(`
+        student:StudentProfile(id, matric_number, full_name)
+      `)
+      .eq("course_id", session.course_id);
 
-    const clockedInStudentIds = new Set(existingRecords.map((r) => r.student_id));
-    const unclocked = session.course.enrollments.filter(
-      (e) => !clockedInStudentIds.has(e.student_id)
-    );
+    if (enrollErr) {
+      return NextResponse.json({ error: enrollErr.message }, { status: 500 });
+    }
+
+    // Fetch existing clocked-in records
+    const { data: existingRecords } = await supabase
+      .from("AttendanceRecord")
+      .select("student_id")
+      .eq("session_id", sessionId);
+
+    const clockedInStudentIds = new Set((existingRecords || []).map((r: any) => r.student_id));
+    const unclocked = (enrollments || [])
+      .map((e: any) => e.student)
+      .filter((s: any) => s && !clockedInStudentIds.has(s.id));
 
     let createdCount = 0;
-    for (const item of unclocked) {
-      await prisma.attendanceRecord.create({
-        data: {
+    for (const student of unclocked) {
+      const { error: insErr } = await supabase
+        .from("AttendanceRecord")
+        .insert({
           session_id: sessionId,
-          student_id: item.student.id,
-          matric_number: item.student.matric_number,
-          full_name: item.student.full_name,
+          student_id: student.id,
+          matric_number: student.matric_number,
+          full_name: student.full_name,
           status: AttendanceStatus.ABSENT,
-          clock_in_time: new Date(),
+          clock_in_time: new Date().toISOString(),
           attendance_token: "ABSENT",
           notes: `Marked absent after session closed by ${user.name}`,
-        },
-      });
-      createdCount++;
+        });
+
+      if (!insErr) createdCount++;
     }
 
     await logAudit({
@@ -74,13 +85,13 @@ export async function POST(
       message: `Successfully recorded ${createdCount} absent student(s).`,
       createdCount,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Mark absent error:", error);
-    return NextResponse.json({ error: "Failed to mark absent students" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to mark absent students" }, { status: 500 });
   }
 }
 
-// Manual correction of attendance status with mandatory reason
+// Manual correction of attendance status in Supabase
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -101,25 +112,33 @@ export async function PATCH(
       );
     }
 
-    const record = await prisma.attendanceRecord.findUnique({
-      where: { id: recordId },
-    });
+    const { data: record, error: fetchErr } = await supabase
+      .from("AttendanceRecord")
+      .select("*")
+      .eq("id", recordId)
+      .maybeSingle();
 
-    if (!record) {
+    if (fetchErr || !record) {
       return NextResponse.json({ error: "Record not found" }, { status: 404 });
     }
 
     const oldStatus = record.status;
 
-    const updated = await prisma.attendanceRecord.update({
-      where: { id: recordId },
-      data: {
+    const { data: updated, error: updateErr } = await supabase
+      .from("AttendanceRecord")
+      .update({
         status: newStatus as AttendanceStatus,
         notes: `Corrected from ${oldStatus} to ${newStatus} by ${user.name}. Reason: ${reason.trim()}`,
-      },
-    });
+      })
+      .eq("id", recordId)
+      .select()
+      .single();
 
-    // Write immutable audit log
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    // Write audit log
     await logAudit({
       actorId: user.userId,
       actorName: user.name,
@@ -134,8 +153,8 @@ export async function PATCH(
       success: true,
       record: updated,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Manual correction error:", error);
-    return NextResponse.json({ error: "Failed to correct attendance record" }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to correct attendance record" }, { status: 500 });
   }
 }

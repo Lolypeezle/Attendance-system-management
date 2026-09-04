@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
+  GraduationCap,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -43,9 +44,14 @@ export default function LoginPage() {
         return;
       }
 
-      setSuccessMsg(`Welcome! Redirecting...`);
+      const userRole = data.user?.role;
+      let targetPath = "/admin";
+      if (userRole === "LECTURER") targetPath = "/lecturer";
+      else if (userRole === "STUDENT") targetPath = "/student";
+
+      setSuccessMsg(`Welcome, ${data.user.name}! Redirecting...`);
       setTimeout(() => {
-        router.push("/admin");
+        router.push(targetPath);
       }, 600);
     } catch {
       setError("Network error occurred. Please check your connection.");
@@ -69,6 +75,29 @@ export default function LoginPage() {
             Federal University Oye-Ekiti • Department of Computer Science
           </p>
         </div>
+
+        {/* Lecturer Portal Switcher Banner */}
+        <Link
+          href="/lecturer/login"
+          className="block p-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 to-slate-900 text-white border border-emerald-500/40 shadow-md hover:border-emerald-400 hover:shadow-emerald-950/20 transition-all group"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                <GraduationCap className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="text-xs font-black text-emerald-300">
+                  Faculty & Lecturer Portal
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  Access lecture sessions & secret word attendance history &rarr;
+                </div>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
 
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-xl border border-slate-200 p-6 sm:p-8 space-y-5">

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const user = await getCurrentUser();
-    if (!user || (user.role !== "SUPERADMIN" && user.role !== "ADMIN" && user.role !== "HOD")) {
+    if (!user || (user.role !== "SUPERADMIN" && user.role !== "HOD")) {
       return NextResponse.json(
         { error: "Access denied. Attendance history is restricted to Administrators." },
         { status: 403 }

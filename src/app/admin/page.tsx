@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Loader2,
   KeyRound,
+  GraduationCap,
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 
@@ -38,6 +39,14 @@ export default function AdminConsolePage() {
 
   const adminModules = [
     {
+      title: "Add & Manage Faculty Lecturers",
+      desc: "Onboard new departmental lecturers, assign 300L courses, configure credentials, and manage portal access permissions.",
+      href: "/admin/users",
+      icon: GraduationCap,
+      color: "bg-emerald-100 text-fuoye-green",
+      badge: "Lecturer Portals",
+    },
+    {
       title: "Lecture Schedules & Secret Words",
       desc: "Fix lecture dates and start times in Nigeria Time (WAT). Set unique secret words given to physical class attendees for clocking in.",
       href: "/admin/sessions",
@@ -50,12 +59,12 @@ export default function AdminConsolePage() {
       desc: "Exclusive institutional attendance ledger across all 300L courses. Search by student matric number, filter by course, and export to Excel/CSV.",
       href: "/admin/attendance",
       icon: History,
-      color: "bg-emerald-100 text-fuoye-green",
+      color: "bg-purple-100 text-purple-700",
       badge: "Admin Exclusive",
     },
     {
-      title: "User Management",
-      desc: "Manage departmental lecturers, admins, and student credentials. Add personal logins, reset passwords, and toggle access.",
+      title: "All Users & Access Management",
+      desc: "Manage departmental lecturers, admins, and student credentials. Add logins, reset passwords, and toggle access.",
       href: "/admin/users",
       icon: Users,
       color: "bg-purple-100 text-purple-800",
@@ -74,7 +83,7 @@ export default function AdminConsolePage() {
       desc: "Configure the 70% exam eligibility threshold, warning mark, and lecture session defaults.",
       href: "/admin/settings",
       icon: Sliders,
-      color: "bg-purple-100 text-purple-700",
+      color: "bg-slate-100 text-slate-700",
       badge: "System Parameters",
     },
   ];
@@ -100,6 +109,22 @@ export default function AdminConsolePage() {
           <p className="text-xs text-slate-500">
             Federal University Oye-Ekiti • Department of Computer Science SAMS
           </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/users"
+            className="px-4 py-2.5 rounded-xl bg-fuoye-green text-white text-xs font-bold hover:bg-fuoye-green-dark flex items-center gap-1.5 shadow-sm transition-colors"
+          >
+            <GraduationCap className="w-4 h-4" />
+            <span>Add Faculty Lecturer</span>
+          </Link>
+          <Link
+            href="/lecturer"
+            className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold flex items-center gap-1.5 transition-colors"
+          >
+            <span>Lecturer View</span>
+          </Link>
         </div>
       </div>
 

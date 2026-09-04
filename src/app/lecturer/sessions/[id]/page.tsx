@@ -19,9 +19,15 @@ import {
   RefreshCw,
   X,
   FileSpreadsheet,
+  KeyRound,
+  Copy,
+  Check,
+  Smartphone,
+  Sparkles,
 } from "lucide-react";
 import { QRCodeModal } from "@/components/QRCodeModal";
 import { AttendanceBadge } from "@/components/AttendanceBadge";
+import { getRemainingExpirySeconds, generateRandomSecretWord } from "@/lib/tokens";
 
 export default function LiveSessionPage() {
   const params = useParams();
@@ -42,6 +48,13 @@ export default function LiveSessionPage() {
   const [correctionReason, setCorrectionReason] = useState("");
   const [savingCorrection, setSavingCorrection] = useState(false);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
+
+  // Class Unique Word & 20-Min Expiry State
+  const [editingWord, setEditingWord] = useState(false);
+  const [newSecretWord, setNewSecretWord] = useState("");
+  const [savingWord, setSavingWord] = useState(false);
+  const [copiedWord, setCopiedWord] = useState(false);
+  const [expirySecs, setExpirySecs] = useState<number>(0);
 
   const fetchLiveFeed = async () => {
     try {
@@ -64,6 +77,47 @@ export default function LiveSessionPage() {
     }, 3000); // 3-second live polling
     return () => clearInterval(interval);
   }, [sessionId, autoRefresh]);
+
+  useEffect(() => {
+    if (!data?.session?.openedAt) return;
+    setExpirySecs(getRemainingExpirySeconds(data.session.openedAt));
+    const interval = setInterval(() => {
+      setExpirySecs(getRemainingExpirySeconds(data.session.openedAt));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [data?.session?.openedAt]);
+
+  const handleUpdateSecretWord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSecretWord.trim()) return;
+    setSavingWord(true);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          action: "UPDATE_SECRET_WORD",
+          secretWord: newSecretWord.trim().toUpperCase(),
+        }),
+      });
+      if (res.ok) {
+        setActionMessage("Class unique word successfully updated.");
+        setEditingWord(false);
+        fetchLiveFeed();
+      }
+    } finally {
+      setSavingWord(false);
+    }
+  };
+
+  const copySecretWord = () => {
+    if (data?.session?.secretWord) {
+      navigator.clipboard.writeText(data.session.secretWord);
+      setCopiedWord(true);
+      setTimeout(() => setCopiedWord(false), 2000);
+    }
+  };
 
   const handleCloseSession = async () => {
     if (!confirm("Are you sure you want to close this lecture session? Students will no longer be able to clock in.")) {
@@ -223,8 +277,8 @@ export default function LiveSessionPage() {
             onClick={() => setIsQrModalOpen(true)}
             className="px-3.5 py-2 rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 text-xs font-black flex items-center gap-1.5 shadow-sm transition-colors"
           >
-            <QrCode className="w-4 h-4" />
-            <span>Projector QR Code</span>
+            <Smartphone className="w-4 h-4" />
+            <span>Display QR on Phone / Screen</span>
           </button>
 
           {isOpen && (
@@ -256,6 +310,165 @@ export default function LiveSessionPage() {
             <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
             <span>Export Course Report</span>
           </Link>
+        </div>
+      </div>
+
+      {/* Dual-Factor Physical Attendance Security Banner */}
+      <div className="bg-white rounded-2xl border-2 border-purple-500/80 shadow-lg shadow-purple-900/5 p-5 space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-purple-100">
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-100 text-purple-900 text-xs font-bold uppercase tracking-wider">
+              <ShieldAlert className="w-3.5 h-3.5 text-purple-700" />
+              <span>Dual-Factor In-Class Attendance Protection</span>
+            </div>
+            <h2 className="text-base font-black text-slate-900 mt-1">
+              Class Attendance Verification Desk
+            </h2>
+            <p className="text-xs text-slate-500">
+              Students must scan the signed QR code from your phone and enter this unique word. Proxy clock-ins are blocked by single-IP enforcement.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsQrModalOpen(true)}
+              className="px-4 py-2.5 rounded-xl bg-fuoye-green hover:bg-fuoye-green-dark text-white text-xs font-extrabold flex items-center gap-2 shadow-md transition-all"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Display QR on My Phone Screen</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+          {/* Class Unique Word Card */}
+          <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-purple-700 flex items-center gap-1.5">
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Class Unique Word</span>
+                </span>
+                {!editingWord && (
+                  <button
+                    onClick={() => {
+                      setNewSecretWord(session.secretWord || "");
+                      setEditingWord(true);
+                    }}
+                    className="text-[11px] font-bold text-purple-600 hover:text-purple-900 underline"
+                  >
+                    Edit Word
+                  </button>
+                )}
+              </div>
+
+              {editingWord ? (
+                <form onSubmit={handleUpdateSecretWord} className="mt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newSecretWord}
+                      onChange={(e) => setNewSecretWord(e.target.value.toUpperCase())}
+                      placeholder="e.g. SPECTRUM"
+                      required
+                      className="w-full text-xs font-mono font-black uppercase p-2 border border-purple-300 rounded-lg bg-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setNewSecretWord(generateRandomSecretWord())}
+                      className="p-2 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200"
+                      title="Generate word"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setEditingWord(false)}
+                      className="px-2 py-1 text-xs text-slate-500 hover:bg-slate-100 rounded"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingWord}
+                      className="px-2.5 py-1 text-xs font-bold bg-purple-700 text-white rounded hover:bg-purple-800"
+                    >
+                      {savingWord ? "Saving..." : "Save Word"}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="mt-2 flex items-center justify-between">
+                  <div className="font-mono text-xl font-black text-purple-950 tracking-widest bg-white px-3 py-1.5 rounded-lg border border-purple-200">
+                    {session.secretWord || "NOT SET"}
+                  </div>
+                  <button
+                    onClick={copySecretWord}
+                    className="px-2.5 py-1.5 rounded-lg bg-white border border-purple-200 hover:bg-purple-100 text-purple-700 text-xs font-bold flex items-center gap-1 transition-colors"
+                  >
+                    {copiedWord ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedWord ? "Copied" : "Copy"}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] text-purple-700 mt-2">
+              Announce this verbally to students physically present in class.
+            </p>
+          </div>
+
+          {/* 20-Minute Attendance Window Countdown Card */}
+          <div className={`p-4 rounded-xl border flex flex-col justify-between ${
+            expirySecs <= 0
+              ? "bg-rose-50 border-rose-300 text-rose-900"
+              : expirySecs < 180
+              ? "bg-rose-50 border-rose-300 text-rose-900 animate-pulse"
+              : expirySecs < 600
+              ? "bg-amber-50 border-amber-300 text-amber-950"
+              : "bg-emerald-50 border-emerald-300 text-emerald-950"
+          }`}>
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                <span>20-Minute Attendance Window</span>
+              </span>
+              <div className="mt-2 font-mono text-2xl font-black tracking-wider">
+                {expirySecs <= 0
+                  ? "EXPIRED"
+                  : `${Math.floor(expirySecs / 60)}:${(expirySecs % 60).toString().padStart(2, "0")}`}
+              </div>
+            </div>
+            <p className="text-[11px] mt-2 opacity-80">
+              {expirySecs <= 0
+                ? "Attendance locked. The 20-minute window from lecture start has elapsed."
+                : "Both the QR code and secret word will automatically expire when this timer reaches 0:00."}
+            </p>
+          </div>
+
+          {/* Single-IP & Anti-Proxy Safeguard */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col justify-between text-xs">
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <ShieldAlert className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Anti-Proxy Rules</span>
+              </span>
+              <div className="mt-2 space-y-1 text-slate-600">
+                <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Single IP per Session Enforced</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Physical QR Scan Token Verified</span>
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              No duplicate IP can submit twice. Submissions without the scanned QR token are blocked.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -426,7 +639,7 @@ export default function LiveSessionPage() {
         </div>
       )}
 
-      {/* Fullscreen Projector QR Modal */}
+      {/* Fullscreen Projector / Mobile QR Modal */}
       <QRCodeModal
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
@@ -434,7 +647,9 @@ export default function LiveSessionPage() {
           id: session.id,
           courseCode: session.courseCode,
           courseTitle: session.courseTitle,
-          qrToken: session.qrToken,
+          qrToken: session.signedQrToken || session.qrToken,
+          secretWord: session.secretWord || session.qrToken,
+          openedAt: session.openedAt,
           lecturerName: session.lecturerName,
         }}
       />

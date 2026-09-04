@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   try {
     const admin = await getCurrentUser();
-    if (!admin || (admin.role !== "SUPERADMIN" && admin.role !== "ADMIN" && admin.role !== "LECTURER" && admin.role !== "HOD")) {
+    if (!admin || (admin.role !== "SUPERADMIN" && admin.role !== "LECTURER" && admin.role !== "HOD")) {
       return NextResponse.json({ error: "Unauthorized access to audit logs." }, { status: 403 });
     }
 

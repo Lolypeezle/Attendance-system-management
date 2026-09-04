@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 import { logAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const settings = await prisma.systemSetting.findMany();
-    return NextResponse.json({ settings });
+    const { data: settings, error } = await supabase.from("SystemSetting").select("*");
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json({ settings: settings || [] });
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch settings" }, { status: 500 });
   }
@@ -29,15 +32,28 @@ export async function POST(req: NextRequest) {
 
     for (const item of settings) {
       if (item.key && item.value !== undefined) {
-        await prisma.systemSetting.upsert({
-          where: { key: item.key },
-          update: { value: String(item.value) },
-          create: {
+        const { data: existing } = await supabase
+          .from("SystemSetting")
+          .select("id")
+          .eq("key", item.key)
+          .maybeSingle();
+
+        if (existing) {
+          await supabase
+            .from("SystemSetting")
+            .update({
+              value: String(item.value),
+              description: item.description !== undefined ? item.description : undefined,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("key", item.key);
+        } else {
+          await supabase.from("SystemSetting").insert({
             key: item.key,
             value: String(item.value),
             description: item.description || null,
-          },
-        });
+          });
+        }
       }
     }
 

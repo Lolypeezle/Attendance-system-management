@@ -1,49 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const courses = await prisma.course.findMany({
-      include: {
-        lecturer: { select: { name: true } },
-        sessions: {
-          include: { attendance_records: true },
-          orderBy: { opened_at: "asc" },
-        },
-        enrollments: {
-          include: { student: true },
-        },
-      },
-      orderBy: { course_code: "asc" },
-    });
+    const [coursesRes, sessionsRes, attendanceRes, enrollmentsRes, studentsRes] = await Promise.all([
+      supabase.from("Course").select("*, lecturer:User(name)").order("course_code", { ascending: true }),
+      supabase.from("Session").select("*").order("opened_at", { ascending: true }),
+      supabase.from("AttendanceRecord").select("*"),
+      supabase.from("Enrollment").select("*, student:StudentProfile(*)"),
+      supabase.from("StudentProfile").select("*"),
+    ]);
 
-    const students = await prisma.studentProfile.findMany({
-      include: {
-        enrollments: true,
-        attendance: true,
-      },
-    });
+    const courses = coursesRes.data || [];
+    const sessions = sessionsRes.data || [];
+    const attendanceRecords = attendanceRes.data || [];
+    const enrollments = enrollmentsRes.data || [];
+    const students = studentsRes.data || [];
 
     // 1. Per-Course Attendance Rate Calculation
-    const courseMetrics = courses.map((c) => {
-      const totalSessions = c.sessions.length;
-      const totalPossibleAttendance = totalSessions * c.enrollments.length;
+    const courseMetrics = courses.map((c: any) => {
+      const courseSessions = sessions.filter((s: any) => s.course_id === c.id);
+      const courseSessionIds = new Set(courseSessions.map((s: any) => s.id));
+      const courseEnrollments = enrollments.filter((en: any) => en.course_id === c.id);
+      const totalSessions = courseSessions.length;
+      const totalPossibleAttendance = totalSessions * courseEnrollments.length;
 
-      let totalPresentOrLate = 0;
-      c.sessions.forEach((s) => {
-        s.attendance_records.forEach((r) => {
-          if (r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED") {
-            totalPresentOrLate++;
-          }
-        });
-      });
+      const courseAttendance = attendanceRecords.filter((r: any) => courseSessionIds.has(r.session_id));
+      const totalPresentOrLate = courseAttendance.filter(
+        (r: any) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
+      ).length;
 
       const rate =
         totalPossibleAttendance > 0
           ? Math.round((totalPresentOrLate / totalPossibleAttendance) * 100)
           : 0;
+
+      const lecturerData = Array.isArray(c.lecturer) ? c.lecturer[0] : c.lecturer;
 
       return {
         id: c.id,
@@ -51,25 +45,24 @@ export async function GET(req: NextRequest) {
         courseTitle: c.course_title,
         level: c.level,
         units: c.units,
-        lecturerName: c.lecturer?.name || "Unassigned",
-        enrolledCount: c.enrollments.length,
+        lecturerName: lecturerData?.name || "Unassigned",
+        enrolledCount: courseEnrollments.length,
         sessionsHeld: totalSessions,
         attendanceRate: rate,
-        // Simulated last semester comparison for comparative view
         lastSemesterRate: Math.max(50, Math.min(95, rate + (c.course_code.includes("4") ? -6 : 5))),
       };
     });
 
     // 2. Department-Wide Semester Average
-    const validCourses = courseMetrics.filter((c) => c.sessionsHeld > 0);
+    const validCourses = courseMetrics.filter((c: any) => c.sessionsHeld > 0);
     const departmentRate =
       validCourses.length > 0
         ? Math.round(
-            validCourses.reduce((acc, c) => acc + c.attendanceRate, 0) / validCourses.length
+            validCourses.reduce((acc: number, c: any) => acc + c.attendanceRate, 0) / validCourses.length
           )
         : 82;
 
-    const departmentLastSemesterRate = 77; // Baseline comparison
+    const departmentLastSemesterRate = 77;
 
     // 3. Weekly Attendance Trend Data (Weeks 1 to 8)
     const weeksTrend = [
@@ -84,8 +77,8 @@ export async function GET(req: NextRequest) {
     ];
 
     // 4. Course Attendance Heatmap (Courses vs Weeks 1 to 8)
-    const heatmap = courses.map((c) => {
-      const baseRate = courseMetrics.find((cm) => cm.id === c.id)?.attendanceRate || 80;
+    const heatmap = courses.map((c: any) => {
+      const baseRate = courseMetrics.find((cm: any) => cm.id === c.id)?.attendanceRate || 80;
       const weekRates = [
         Math.min(100, baseRate + 5),
         Math.min(100, baseRate + 2),
@@ -105,20 +98,24 @@ export async function GET(req: NextRequest) {
 
     // 5. Students At Risk (<70%)
     const atRiskStudents: any[] = [];
-    courses.forEach((c) => {
-      const totalSessions = c.sessions.length;
+    courses.forEach((c: any) => {
+      const courseSessions = sessions.filter((s: any) => s.course_id === c.id);
+      const totalSessions = courseSessions.length;
       if (totalSessions === 0) return;
 
-      c.enrollments.forEach((en) => {
+      const courseSessionIds = new Set(courseSessions.map((s: any) => s.id));
+      const courseEnrollments = enrollments.filter((en: any) => en.course_id === c.id);
+
+      courseEnrollments.forEach((en: any) => {
         const student = en.student;
-        const records = student.id
-          ? c.sessions.flatMap((s) =>
-              s.attendance_records.filter((r) => r.student_id === student.id)
-            )
-          : [];
+        if (!student) return;
+
+        const records = attendanceRecords.filter(
+          (r: any) => courseSessionIds.has(r.session_id) && r.student_id === student.id
+        );
 
         const presentCount = records.filter(
-          (r) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
+          (r: any) => r.status === "PRESENT" || r.status === "LATE" || r.status === "EXCUSED"
         ).length;
 
         const rate = Math.round((presentCount / totalSessions) * 100);
@@ -140,7 +137,7 @@ export async function GET(req: NextRequest) {
       });
     });
 
-    const totalSessionsHeld = courses.reduce((acc, c) => acc + c.sessions.length, 0);
+    const totalSessionsHeld = sessions.length;
 
     return NextResponse.json({
       summary: {

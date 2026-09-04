@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
-import { prisma } from "./db";
 import { Role } from "./types";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fuoye-sams-super-secure-key-2026";

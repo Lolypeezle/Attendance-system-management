@@ -197,12 +197,12 @@ INSERT INTO "User" ("id", "name", "email", "password_hash", "role", "is_active")
 
 -- 300L Student Profiles
 INSERT INTO "StudentProfile" ("id", "user_id", "full_name", "matric_number", "level", "email") VALUES
-('std_01', 'usr_std_01', 'Ajayi Damilola', 'CSC/2022/1001', '300L', 'student@fuoye.edu.ng'),
-('std_02', NULL, 'Eze Collins', 'CSC/2022/1002', '300L', 'c.eze@fuoye.edu.ng'),
-('std_03', NULL, 'Ojo Victoria', 'CSC/2022/1003', '300L', 'v.ojo@fuoye.edu.ng'),
-('std_04', NULL, 'Lawal Hammed', 'CSC/2022/1004', '300L', 'h.lawal@fuoye.edu.ng'),
-('std_05', NULL, 'Musa Amina', 'CSC/2022/1005', '300L', 'a.musa@fuoye.edu.ng'),
-('std_06', NULL, 'Okafor Ifeanyi', 'CSC/2022/1006', '300L', 'i.okafor@fuoye.edu.ng');
+('std_01', 'usr_std_01', 'Ajayi Damilola', 'CSC/2023/1001', '300L', 'student@fuoye.edu.ng'),
+('std_02', NULL, 'Eze Collins', 'CSC/2023/1002', '300L', 'c.eze@fuoye.edu.ng'),
+('std_03', NULL, 'Ojo Victoria', 'CSC/2023/1003', '300L', 'v.ojo@fuoye.edu.ng'),
+('std_04', NULL, 'Lawal Hammed', 'CSC/2023/1004', '300L', 'h.lawal@fuoye.edu.ng'),
+('std_05', NULL, 'Musa Amina', 'CSC/2023/1005', '300L', 'a.musa@fuoye.edu.ng'),
+('std_06', NULL, 'Okafor Ifeanyi', 'CSC/2023/1006', '300L', 'i.okafor@fuoye.edu.ng');
 
 -- The 8 Specific 300L Courses
 INSERT INTO "Course" ("id", "course_code", "course_title", "units", "level", "lecturer_id") VALUES
@@ -227,8 +227,8 @@ INSERT INTO "Session" ("id", "course_id", "opened_by", "opened_at", "duration_mi
 
 -- Pre-seed some sample attendance records for CSC 302
 INSERT INTO "AttendanceRecord" ("session_id", "student_id", "matric_number", "full_name", "status", "attendance_token") VALUES
-('ses_active_302', 'std_01', 'CSC/2022/1001', 'Ajayi Damilola', 'PRESENT', 'FY-302A'),
-('ses_active_302', 'std_02', 'CSC/2022/1002', 'Eze Collins', 'PRESENT', 'FY-302B');
+('ses_active_302', 'std_01', 'CSC/2023/1001', 'Ajayi Damilola', 'PRESENT', 'FY-302A'),
+('ses_active_302', 'std_02', 'CSC/2023/1002', 'Eze Collins', 'PRESENT', 'FY-302B');
 
 -- System Settings (FUOYE Coordinates)
 INSERT INTO "SystemSetting" ("key", "value", "description") VALUES

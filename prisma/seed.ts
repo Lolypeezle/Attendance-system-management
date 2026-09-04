@@ -251,9 +251,9 @@ async function main() {
   await prisma.attendanceRecord.create({
     data: {
       session_id: activeSession.id,
-      student_id: level400Students[1].id,
-      matric_number: level400Students[1].matric_number,
-      full_name: level400Students[1].full_name,
+      student_id: level300Students[1].id,
+      matric_number: level300Students[1].matric_number,
+      full_name: level300Students[1].full_name,
       status: AttendanceStatus.PRESENT,
       clock_in_time: new Date(Date.now() - 8 * 60 * 1000),
       attendance_token: "FY-401A",
@@ -265,9 +265,9 @@ async function main() {
   await prisma.attendanceRecord.create({
     data: {
       session_id: activeSession.id,
-      student_id: level400Students[2].id,
-      matric_number: level400Students[2].matric_number,
-      full_name: level400Students[2].full_name,
+      student_id: level300Students[2].id,
+      matric_number: level300Students[2].matric_number,
+      full_name: level300Students[2].full_name,
       status: AttendanceStatus.PRESENT,
       clock_in_time: new Date(Date.now() - 5 * 60 * 1000),
       attendance_token: "FY-401B",
@@ -288,7 +288,7 @@ async function main() {
     const pDate = pastDates[i];
     const s = await prisma.session.create({
       data: {
-        course_id: csc401.id,
+        course_id: csc304.id,
         opened_by: lecturer2.id,
         opened_at: pDate,
         closed_at: new Date(pDate.getTime() + 90 * 60 * 1000),
@@ -299,9 +299,9 @@ async function main() {
       },
     });
 
-    // Populate attendance records for 400L students
-    for (let idx = 0; idx < level400Students.length; idx++) {
-      const student = level400Students[idx];
+    // Populate attendance records for 300L students
+    for (let idx = 0; idx < level300Students.length; idx++) {
+      const student = level300Students[idx];
       let status: AttendanceStatus = AttendanceStatus.PRESENT;
       // create some late & absent to simulate realistic statistics and at-risk students
       if (idx === 4 && i > 0) {
@@ -328,12 +328,12 @@ async function main() {
     }
   }
 
-  // Add historical sessions for CSC 301
+  // Add historical sessions for CSC 306
   for (let i = 0; i < 3; i++) {
     const pDate = pastDates[i];
     const s = await prisma.session.create({
       data: {
-        course_id: csc301.id,
+        course_id: csc306.id,
         opened_by: hod.id,
         opened_at: pDate,
         closed_at: new Date(pDate.getTime() + 60 * 60 * 1000),
@@ -361,7 +361,7 @@ async function main() {
   // 8. Sample Excuse Request
   await prisma.excuseRequest.create({
     data: {
-      student_id: level400Students[0].id,
+      student_id: level300Students[0].id,
       session_id: activeSession.id,
       reason: "Medical appointment at FUOYE University Health Centre due to fever and tests.",
       document_url: "https://fuoye.edu.ng/health/medical-report-sample.pdf",

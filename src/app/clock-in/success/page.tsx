@@ -61,7 +61,7 @@ export default function ClockInSuccessPage() {
     courseTitle: "Object-Oriented Programming & Systems",
     lecturerName: "Mrs. F. I. Okonjo",
     studentName: "Ajayi Damilola",
-    matricNumber: "CSC/2022/1001",
+    matricNumber: "CSC/2023/1001",
     clockInTime: new Date().toISOString(),
     status: "PRESENT",
     attendanceToken: "FY-302A",

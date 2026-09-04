@@ -62,22 +62,33 @@ export async function POST(req: NextRequest) {
 
     const cleanCode = courseCode.trim().toUpperCase();
 
-    const existing = await prisma.course.findUnique({
-      where: { course_code: cleanCode },
-    });
+    const { data: existing } = await supabase
+      .from("Course")
+      .select("id")
+      .eq("course_code", cleanCode)
+      .maybeSingle();
+
     if (existing) {
       return NextResponse.json({ error: "Course code already exists." }, { status: 409 });
     }
 
-    const course = await prisma.course.create({
-      data: {
+    const newCourseId = `crs_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    const { data: course, error: insertErr } = await supabase
+      .from("Course")
+      .insert({
+        id: newCourseId,
         course_code: cleanCode,
         course_title: courseTitle.trim(),
         units: parseInt(units || "3", 10),
         level: level || "100L",
         lecturer_id: lecturerId || null,
-      },
-    });
+      })
+      .select()
+      .single();
+
+    if (insertErr) {
+      throw insertErr;
+    }
 
     await logAudit({
       actorId: user.userId,
@@ -89,9 +100,9 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, course });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create course error:", error);
-    return NextResponse.json({ error: "Failed to create course." }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to create course." }, { status: 500 });
   }
 }
 
@@ -108,10 +119,11 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: "Course ID is required." }, { status: 400 });
     }
 
-    const existingCourse = await prisma.course.findUnique({
-      where: { id: courseId },
-      include: { lecturer: true },
-    });
+    const { data: existingCourse } = await supabase
+      .from("Course")
+      .select("*, lecturer:User(id, name, email)")
+      .eq("id", courseId)
+      .maybeSingle();
 
     if (!existingCourse) {
       return NextResponse.json({ error: "Course not found." }, { status: 404 });
@@ -123,13 +135,16 @@ export async function PATCH(req: NextRequest) {
     if (units) updateData.units = parseInt(units, 10);
     if (level) updateData.level = level;
 
-    const updatedCourse = await prisma.course.update({
-      where: { id: courseId },
-      data: updateData,
-      include: {
-        lecturer: { select: { id: true, name: true, email: true } },
-      },
-    });
+    const { data: updatedCourse, error: updateErr } = await supabase
+      .from("Course")
+      .update(updateData)
+      .eq("id", courseId)
+      .select("*, lecturer:User(id, name, email)")
+      .single();
+
+    if (updateErr) {
+      throw updateErr;
+    }
 
     await logAudit({
       actorId: user.userId,
@@ -148,9 +163,9 @@ export async function PATCH(req: NextRequest) {
     });
 
     return NextResponse.json({ success: true, course: updatedCourse });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Update course error:", error);
-    return NextResponse.json({ error: "Failed to update course." }, { status: 500 });
+    return NextResponse.json({ error: error.message || "Failed to update course." }, { status: 500 });
   }
 }
 

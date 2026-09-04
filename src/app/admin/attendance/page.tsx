@@ -189,7 +189,7 @@ export default function AdminAttendanceHistoryPage() {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
           <input
             type="text"
-            placeholder="Search by Matric Number (e.g. CSC/2022/1001)..."
+            placeholder="Search by Matric Number (e.g. CSC/2023/1001)..."
             value={searchMatric}
             onChange={(e) => setSearchMatric(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && fetchAttendance()}

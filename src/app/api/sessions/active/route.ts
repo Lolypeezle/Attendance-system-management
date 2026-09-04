@@ -1,7 +1,39 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import {
+  signSessionQrToken,
+  getSessionQrExpiry,
+  getRemainingExpirySeconds,
+  isSessionAttendanceExpired,
+} from "@/lib/tokens";
 
 export const dynamic = "force-dynamic";
+
+function enrichSession(s: any) {
+  if (!s) return s;
+  const openedAt = s.opened_at || s.created_at || new Date().toISOString();
+  const expiryTimestamp = getSessionQrExpiry(openedAt);
+  const signedQrToken = signSessionQrToken(s.id, expiryTimestamp);
+  const remainingSeconds = getRemainingExpirySeconds(openedAt);
+  const isExpired = isSessionAttendanceExpired(openedAt);
+  const rawSecret = (s.qr_token || "").trim();
+  let secretWord = rawSecret;
+  if (rawSecret.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(rawSecret);
+      secretWord = parsed.secretWord || rawSecret;
+    } catch {}
+  }
+
+  return {
+    ...s,
+    secretWord: secretWord.toUpperCase(),
+    signedQrToken,
+    remainingSeconds,
+    isExpired,
+    expiryTimestamp,
+  };
+}
 
 export async function GET() {
   try {
@@ -38,7 +70,7 @@ export async function GET() {
           .update({ status: "CLOSED", closed_at: new Date().toISOString() })
           .eq("id", session.id);
       } else {
-        activeSessions.push(session);
+        activeSessions.push(enrichSession(session));
       }
     }
 
@@ -48,4 +80,3 @@ export async function GET() {
     return NextResponse.json({ sessions: [] });
   }
 }
-
