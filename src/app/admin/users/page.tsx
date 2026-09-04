@@ -388,9 +388,9 @@ export default function AdminUsersPage() {
                   <tr key={user.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4">
                       <span className="font-bold text-slate-900 block">{user.name}</span>
-                      {user.student_profile && (
+                      {user.student_profile?.matric_number && (
                         <span className="text-[11px] font-mono text-fuoye-green font-bold">
-                          {user.student_profile.matric_number} ({user.student_profile.level})
+                          {user.student_profile.matric_number} {user.student_profile.level ? `(${user.student_profile.level})` : ""}
                         </span>
                       )}
                     </td>
