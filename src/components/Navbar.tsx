@@ -99,7 +99,7 @@ export function Navbar() {
 
           {/* User Auth Section */}
           <div className="hidden md:flex items-center gap-3">
-            {currentUser ? (
+            {currentUser && (currentUser.role === "LECTURER" || currentUser.role === "HOD" || currentUser.role === "SUPERADMIN") ? (
               <div className="flex items-center gap-3 border-l border-slate-200 pl-3">
                 <div className="flex items-center gap-2">
                   {currentUser.role === "LECTURER" && (
@@ -152,36 +152,12 @@ export function Navbar() {
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <Link
-                  href="/lecturer/login"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 shadow-xs transition-colors"
-                >
-                  <GraduationCap className="w-3.5 h-3.5 text-fuoye-green" />
-                  <span>Lecturer Portal</span>
-                </Link>
-                <Link
-                  href="/login"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
-                  <span>Admin</span>
-                </Link>
-              </div>
-            )}
+            ) : null}
           </div>
 
 
           {/* Mobile menu hamburger */}
           <div className="flex md:hidden items-center gap-2">
-            <Link
-              href="/lecturer/login"
-              className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-emerald-50 text-fuoye-green border border-emerald-200 shadow-xs flex items-center gap-1"
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>Lecturer</span>
-            </Link>
             <Link
               href="/clock-in"
               className="text-xs font-bold px-3 py-1.5 rounded-lg bg-fuoye-green text-white shadow-sm flex items-center gap-1"
@@ -221,22 +197,26 @@ export function Navbar() {
               );
             })}
 
-            <Link
-              href="/lecturer/login"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-800 bg-emerald-50"
-            >
-              <GraduationCap className="w-4 h-4 text-fuoye-green" />
-              <span>Lecturer Portal Login</span>
-            </Link>
+            {currentUser && (currentUser.role === "LECTURER" || currentUser.role === "HOD" || currentUser.role === "SUPERADMIN") && (
+              <>
+                <Link
+                  href="/lecturer"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-emerald-800 bg-emerald-50"
+                >
+                  <GraduationCap className="w-4 h-4 text-fuoye-green" />
+                  <span>Lecturer Workspace</span>
+                </Link>
 
-            <Link
-              href="/lecturer/history"
-              onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-purple-900 bg-purple-50"
-            >
-              <span>Secret Word Attendance History</span>
-            </Link>
+                <Link
+                  href="/lecturer/history"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium text-purple-900 bg-purple-50"
+                >
+                  <span>Secret Word Attendance History</span>
+                </Link>
+              </>
+            )}
 
             <div className="pt-2 border-t border-slate-100">
               {currentUser ? (

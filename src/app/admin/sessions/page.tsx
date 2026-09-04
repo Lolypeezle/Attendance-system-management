@@ -339,11 +339,11 @@ export default function AdminSessionsPage() {
               </p>
             </div>
 
-            {/* 1-Hour Strict Policy Notice */}
+            {/* 20-Minute Strict Policy Notice */}
             <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-900 flex items-start gap-2">
               <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
               <span>
-                <strong>Strict 1-Hour Rule:</strong> The secret word expires automatically <strong>1 hour (60 minutes)</strong> after the class start time. Students arriving more than 1 hour late are locked out and cannot clock in.
+                <strong>Strict 20-Minute Rule:</strong> The secret word expires automatically <strong>20 minutes</strong> after the class start time. Students arriving more than 20 minutes late are locked out and cannot clock in.
               </span>
             </div>
 

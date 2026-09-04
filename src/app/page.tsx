@@ -183,7 +183,7 @@ export default function HomePage() {
             </div>
             <h3 className="text-base font-bold text-slate-900">Secret Word Verification</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Input the unique secret code given by your lecturer in class. Codes strictly expire 1 hour after class starts.
+              Input the unique secret code given by your lecturer in class. Codes strictly expire 20 minutes after class starts.
             </p>
           </div>
         </div>
