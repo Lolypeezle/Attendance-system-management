@@ -364,17 +364,17 @@ export default function LecturerPage() {
           </Link>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[460px] overflow-y-auto styled-scrollbar rounded-xl border border-slate-200">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+            <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10 shadow-2xs">
               <tr>
-                <th className="py-3 px-4">Course</th>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Secret Word</th>
-                <th className="py-3 px-4">Duration</th>
-                <th className="py-3 px-4">Clocked In</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3 px-4 bg-slate-100">Course</th>
+                <th className="py-3 px-4 bg-slate-100">Date</th>
+                <th className="py-3 px-4 bg-slate-100">Secret Word</th>
+                <th className="py-3 px-4 bg-slate-100">Duration</th>
+                <th className="py-3 px-4 bg-slate-100">Clocked In</th>
+                <th className="py-3 px-4 bg-slate-100">Status</th>
+                <th className="py-3 px-4 text-right bg-slate-100">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium">
@@ -868,15 +868,15 @@ export default function LecturerPage() {
                     </p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[55vh] overflow-y-auto styled-scrollbar rounded-xl border border-slate-200">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
+                      <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10 shadow-2xs">
                         <tr>
-                          <th className="py-2.5 px-3">#</th>
-                          <th className="py-2.5 px-3">Student Full Name</th>
-                          <th className="py-2.5 px-3">Matriculation Number</th>
-                          <th className="py-2.5 px-3">Clock-In Time (WAT)</th>
-                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3 bg-slate-100">#</th>
+                          <th className="py-2.5 px-3 bg-slate-100">Student Full Name</th>
+                          <th className="py-2.5 px-3 bg-slate-100">Matriculation Number</th>
+                          <th className="py-2.5 px-3 bg-slate-100">Clock-In Time (WAT)</th>
+                          <th className="py-2.5 px-3 bg-slate-100">Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 font-medium">

@@ -559,17 +559,17 @@ export default function LiveSessionPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-auto max-h-[480px] styled-scrollbar border border-slate-200 rounded-xl shadow-2xs">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-black uppercase tracking-wider z-10 shadow-2xs">
                   <tr>
-                    <th className="py-3 px-4">#</th>
-                    <th className="py-3 px-4">Student Full Name</th>
-                    <th className="py-3 px-4">Matriculation Number</th>
-                    <th className="py-3 px-4">Clock-In Time</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Device / IP</th>
-                    <th className="py-3 px-4 text-right">Action</th>
+                    <th className="py-3 px-4 bg-slate-100">#</th>
+                    <th className="py-3 px-4 bg-slate-100">Student Full Name</th>
+                    <th className="py-3 px-4 bg-slate-100">Matriculation Number</th>
+                    <th className="py-3 px-4 bg-slate-100">Clock-In Time</th>
+                    <th className="py-3 px-4 bg-slate-100">Status</th>
+                    <th className="py-3 px-4 bg-slate-100">Device / IP</th>
+                    <th className="py-3 px-4 text-right bg-slate-100">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
@@ -657,21 +657,23 @@ export default function LiveSessionPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-            {unclockedStudents.map((s: any) => (
-              <div
-                key={s.id}
-                className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between text-xs"
-              >
-                <div>
-                  <span className="font-bold text-slate-800 block">{s.fullName}</span>
-                  <span className="font-mono text-[11px] text-slate-500">{s.matricNumber}</span>
+          <div className="max-h-[320px] overflow-y-auto styled-scrollbar p-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {unclockedStudents.map((s: any) => (
+                <div
+                  key={s.id}
+                  className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between text-xs"
+                >
+                  <div>
+                    <span className="font-bold text-slate-800 block">{s.fullName}</span>
+                    <span className="font-mono text-[11px] text-slate-500">{s.matricNumber}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                    Unmarked
+                  </span>
                 </div>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
-                  Unmarked
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}

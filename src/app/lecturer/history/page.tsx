@@ -322,16 +322,16 @@ export default function LecturerHistoryPage() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[520px] overflow-y-auto styled-scrollbar">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
+              <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10 shadow-2xs">
                 <tr>
-                  <th className="py-3.5 px-4">Course Details</th>
-                  <th className="py-3.5 px-4">Lecture Date & WAT Time</th>
-                  <th className="py-3.5 px-4">Assigned Secret Word</th>
-                  <th className="py-3.5 px-4">Session Status</th>
-                  <th className="py-3.5 px-4">Attendance Summary</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4 bg-slate-100">Course Details</th>
+                  <th className="py-3.5 px-4 bg-slate-100">Lecture Date & WAT Time</th>
+                  <th className="py-3.5 px-4 bg-slate-100">Assigned Secret Word</th>
+                  <th className="py-3.5 px-4 bg-slate-100">Session Status</th>
+                  <th className="py-3.5 px-4 bg-slate-100">Attendance Summary</th>
+                  <th className="py-3.5 px-4 text-right bg-slate-100">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -573,17 +573,17 @@ export default function LecturerHistoryPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[55vh] overflow-y-auto styled-scrollbar rounded-xl border border-slate-200">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider">
+                    <thead className="sticky top-0 bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider z-10 shadow-2xs">
                       <tr>
-                        <th className="py-2.5 px-3">#</th>
-                        <th className="py-2.5 px-3">Matric Number</th>
-                        <th className="py-2.5 px-3">Student Name</th>
-                        <th className="py-2.5 px-3">Status</th>
-                        <th className="py-2.5 px-3">Clock-In Time</th>
-                        <th className="py-2.5 px-3">Verification Slip</th>
-                        <th className="py-2.5 px-3">Anti-Proxy Integrity</th>
+                        <th className="py-2.5 px-3 bg-slate-100">#</th>
+                        <th className="py-2.5 px-3 bg-slate-100">Matric Number</th>
+                        <th className="py-2.5 px-3 bg-slate-100">Student Name</th>
+                        <th className="py-2.5 px-3 bg-slate-100">Status</th>
+                        <th className="py-2.5 px-3 bg-slate-100">Clock-In Time</th>
+                        <th className="py-2.5 px-3 bg-slate-100">Verification Slip</th>
+                        <th className="py-2.5 px-3 bg-slate-100">Anti-Proxy Integrity</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 font-medium">
