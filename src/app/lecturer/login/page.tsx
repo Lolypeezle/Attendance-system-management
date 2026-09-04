@@ -32,9 +32,19 @@ export default function LecturerLoginPage() {
 
   const demoLecturers = [
     {
-      name: "MR ODUFUWA",
-      email: "odufuwa@fuoye.edu.ng",
-      courses: "CSC 302 (OOP)",
+      name: "Dr. K. M. Balogun",
+      email: "balogun@fuoye.edu.ng",
+      courses: "CSC 304, CSC 316",
+    },
+    {
+      name: "Dr. S. O. Adeyemi",
+      email: "adeyemi@fuoye.edu.ng",
+      courses: "CSC 308, CSC 314",
+    },
+    {
+      name: "Mrs. F. I. Okonjo",
+      email: "okonjo@fuoye.edu.ng",
+      courses: "CSC 302, CSC 312",
     },
   ];
 
