@@ -241,14 +241,14 @@ export default function LecturerPage() {
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-sm font-black text-fuoye-green">
-                      {session.course.course_code}
+                      {session.course?.course_code || "Course"}
                     </span>
                     <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 animate-pulse">
                       ● LIVE NOW
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-slate-900 mt-1">
-                    {session.course.course_title}
+                    {session.course?.course_title || "Lecture Session"}
                   </h3>
                   <p className="text-xs text-slate-500 mt-1">
                     Opened at: {new Date(session.opened_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} • Duration: {session.duration_minutes} mins
@@ -290,7 +290,7 @@ export default function LecturerPage() {
 
                 <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
                   <span className="text-[11px] text-slate-400">
-                    Lecturer: {session.lecturer.name}
+                    Lecturer: {session.lecturer?.name || session.course?.lecturer?.name || currentUser?.name || "Faculty Lecturer"}
                   </span>
                   <Link
                     href={`/lecturer/sessions/${session.id}`}
@@ -349,10 +349,10 @@ export default function LecturerPage() {
                   <tr key={sess.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4">
                       <span className="font-bold text-slate-900 block">
-                        {sess.course.course_code}
+                        {sess.course?.course_code || "Course"}
                       </span>
                       <span className="text-[11px] text-slate-500">
-                        {sess.course.course_title}
+                        {sess.course?.course_title || "Lecture Session"}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-700">

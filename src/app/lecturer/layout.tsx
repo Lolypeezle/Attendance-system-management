@@ -17,21 +17,21 @@ export default function LecturerLayout({ children }: { children: React.ReactNode
       return;
     }
 
-    fetch("/api/auth/me")
+    fetch("/api/auth/me", { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) {
           router.replace("/lecturer/login");
           return;
         }
         const data = await res.json();
+        const role = (data.user?.role || "").toUpperCase();
         if (
-          data.user &&
-          (data.user.role === "LECTURER" ||
-            data.user.role === "HOD" ||
-            data.user.role === "SUPERADMIN")
+          role === "LECTURER" ||
+          role === "HOD" ||
+          role === "SUPERADMIN"
         ) {
           setAuthorized(true);
-        } else if (data.user && data.user.role === "STUDENT") {
+        } else if (role === "STUDENT") {
           router.replace("/student");
         } else {
           router.replace("/lecturer/login");

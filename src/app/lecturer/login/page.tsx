@@ -75,7 +75,7 @@ export default function LecturerLoginPage() {
         return;
       }
 
-      const role = data.user?.role;
+      const role = (data.user?.role || "").toUpperCase();
       if (role === "STUDENT") {
         setError(
           "Access denied. This portal is exclusively for Academic Lecturers. Please use the Student Portal or Clock-In page."
@@ -88,8 +88,8 @@ export default function LecturerLoginPage() {
 
       setSuccessMsg(`Welcome, ${data.user.name}! Accessing Lecturer Portal...`);
       setTimeout(() => {
-        router.push("/lecturer");
-      }, 700);
+        window.location.href = "/lecturer";
+      }, 400);
     } catch {
       setError("Network connection error. Please try again.");
       setLoading(false);

@@ -51,8 +51,8 @@ export default function LoginPage() {
 
       setSuccessMsg(`Welcome, ${data.user.name}! Redirecting...`);
       setTimeout(() => {
-        router.push(targetPath);
-      }, 600);
+        window.location.href = targetPath;
+      }, 400);
     } catch {
       setError("Network error occurred. Please check your connection.");
       setLoading(false);

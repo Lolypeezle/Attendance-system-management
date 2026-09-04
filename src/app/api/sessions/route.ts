@@ -26,8 +26,22 @@ function enrichSession(s: any) {
     } catch {}
   }
 
+  const courseObj = s.course || {
+    id: s.course_id || "",
+    course_code: "Course",
+    course_title: "Lecture Session",
+    level: "300L",
+  };
+
+  const lecturerObj = s.lecturer || s.course?.lecturer || {
+    name: "Faculty Lecturer",
+    email: "",
+  };
+
   return {
     ...s,
+    course: courseObj,
+    lecturer: lecturerObj,
     secretWord: secretWord.toUpperCase(),
     signedQrToken,
     remainingSeconds,
@@ -54,7 +68,8 @@ export async function GET(req: NextRequest) {
         qr_token,
         status,
         created_at,
-        course:Course(id, course_code, course_title, level)
+        course:Course(id, course_code, course_title, level, lecturer:User(id, name, email)),
+        lecturer:User(id, name, email)
       `)
       .order("opened_at", { ascending: false });
 

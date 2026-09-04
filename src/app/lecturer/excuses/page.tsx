@@ -144,7 +144,7 @@ export default function LecturerExcusesPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-xs font-black text-fuoye-green px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">
-                    {exc.session.course.course_code}
+                    {exc.session?.course?.course_code || "Course"}
                   </span>
                   <span
                     className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full ${
@@ -237,7 +237,7 @@ export default function LecturerExcusesPage() {
                 <span className="font-bold">Matric Number:</span> {selectedExcuse.student.matric_number}
               </p>
               <p>
-                <span className="font-bold">Course:</span> {selectedExcuse.session.course.course_code}
+                <span className="font-bold">Course:</span> {selectedExcuse.session?.course?.course_code || "Course"}
               </p>
               <p className="mt-2 text-slate-700 font-medium">
                 &ldquo;{selectedExcuse.reason}&rdquo;
