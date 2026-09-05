@@ -30,6 +30,7 @@ import {
 import * as XLSX from "xlsx";
 import { StatCard } from "@/components/StatCard";
 import { QRCodeModal } from "@/components/QRCodeModal";
+import { CourseAttendanceModal } from "@/components/CourseAttendanceModal";
 import {
   generateRandomSecretWord,
   getRemainingExpirySeconds,
@@ -74,10 +75,13 @@ export default function LecturerPage() {
   // Quick QR preview modal
   const [qrModalSession, setQrModalSession] = useState<any>(null);
 
-  // Clocked-in students roster modal
+  // Clocked-in students roster modal (Session level)
   const [attendanceModalSession, setAttendanceModalSession] = useState<any>(null);
   const [studentSearch, setStudentSearch] = useState("");
   const [studentStatusFilter, setStudentStatusFilter] = useState("ALL");
+
+  // Course Clocked-in Students Roster modal (Course level)
+  const [courseAttendanceModalCourse, setCourseAttendanceModalCourse] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -248,6 +252,80 @@ export default function LecturerPage() {
           icon={<Users className="w-5 h-5 text-purple-700" />}
           color="purple"
         />
+      </div>
+
+      {/* Assigned Courses & Attendance Rosters */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-fuoye-green" />
+              <h2 className="text-base font-black text-slate-900">
+                Assigned Courses & Student Clock-In Rosters
+              </h2>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {courses.length} Course{courses.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Select any course to view the total number, full names, and matriculation numbers of students who clocked in.
+            </p>
+          </div>
+        </div>
+
+        {courses.length === 0 ? (
+          <div className="p-8 text-center space-y-2">
+            <BookOpen className="w-8 h-8 text-slate-300 mx-auto" />
+            <p className="text-xs text-slate-500 font-medium">No assigned courses found for your account.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {courses.map((course) => {
+              const courseSessions = sessions.filter((s) => s.course_id === course.id);
+              const totalClockIns = courseSessions.reduce(
+                (sum, s) => sum + (s.clockedInCount || s.records?.length || s.attendance_records?.length || 0),
+                0
+              );
+
+              return (
+                <div
+                  key={course.id}
+                  className="rounded-2xl p-4 border border-slate-200 hover:border-emerald-300 hover:shadow-md transition-all bg-gradient-to-b from-white to-slate-50/50 flex flex-col justify-between space-y-3"
+                >
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-sm font-black text-fuoye-green">
+                        {course.course_code}
+                      </span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                        {course.level} • {course.units} Units
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug line-clamp-2">
+                      {course.course_title}
+                    </h3>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 pt-1">
+                      <span>{courseSessions.length} Session{courseSessions.length === 1 ? "" : "s"}</span>
+                      <span>•</span>
+                      <span className="font-bold text-emerald-800">{totalClockIns} Total Clock-Ins</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => setCourseAttendanceModalCourse(course)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-fuoye-green hover:bg-fuoye-green-dark text-white text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer"
+                      title="View all student names and matric numbers who clocked in for this course"
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>View Clocked-In Students</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Active Sessions Live Spotlight */}
@@ -849,6 +927,26 @@ export default function LecturerPage() {
                       <span>Export (.xlsx)</span>
                     </button>
                   )}
+                  <button
+                    onClick={() => {
+                      const matchedCourse = courses.find(
+                        (c) =>
+                          c.id === attendanceModalSession.course_id ||
+                          c.course_code ===
+                            (attendanceModalSession.course?.course_code ||
+                              attendanceModalSession.courseCode)
+                      );
+                      if (matchedCourse) {
+                        setAttendanceModalSession(null);
+                        setCourseAttendanceModalCourse(matchedCourse);
+                      }
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-fuoye-green border border-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="View all students who clocked in for this course across all sessions"
+                  >
+                    <BookOpen className="w-3.5 h-3.5 text-fuoye-green" />
+                    <span>View Entire Course Roster</span>
+                  </button>
                   <Link
                     href={`/lecturer/sessions/${attendanceModalSession.id}`}
                     className="px-3.5 py-2 rounded-xl bg-fuoye-green hover:bg-fuoye-green-dark text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
@@ -941,6 +1039,17 @@ export default function LecturerPage() {
           </div>
         );
       })()}
+
+      {/* Course Attendance Roster Modal */}
+      {courseAttendanceModalCourse && (
+        <CourseAttendanceModal
+          isOpen={true}
+          onClose={() => setCourseAttendanceModalCourse(null)}
+          courseId={courseAttendanceModalCourse.id}
+          courseCode={courseAttendanceModalCourse.course_code}
+          courseTitle={courseAttendanceModalCourse.course_title}
+        />
+      )}
     </div>
   );
 }

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { StatCard } from "@/components/StatCard";
 import * as XLSX from "xlsx";
+import { CourseAttendanceModal } from "@/components/CourseAttendanceModal";
 
 export default function LecturerHistoryPage() {
   const [sessions, setSessions] = useState<any[]>([]);
@@ -43,6 +44,9 @@ export default function LecturerHistoryPage() {
   const [selectedCourse, setSelectedCourse] = useState("ALL");
   const [selectedStatus, setSelectedStatus] = useState("ALL");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Course Clock-in Students Modal
+  const [courseModalCourse, setCourseModalCourse] = useState<any>(null);
 
   // Drilldown Modal
   const [activeSessionModal, setActiveSessionModal] = useState<any>(null);
@@ -257,6 +261,19 @@ export default function LecturerHistoryPage() {
                 </option>
               ))}
             </select>
+            {selectedCourse !== "ALL" && (
+              <button
+                onClick={() => {
+                  const crs = courses.find((c) => c.id === selectedCourse);
+                  if (crs) setCourseModalCourse(crs);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-fuoye-green hover:bg-fuoye-green-dark text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                title="View student names, matric numbers, and clock-in records for this course"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>View Course Students</span>
+              </button>
+            )}
           </div>
 
           {/* Status filter */}
@@ -450,6 +467,20 @@ export default function LecturerHistoryPage() {
                           <FileSpreadsheet className="w-3.5 h-3.5" />
                           <span>View Roster</span>
                         </button>
+                        <button
+                          onClick={() => {
+                            setCourseModalCourse({
+                              id: sess.course_id,
+                              course_code: sess.course?.course_code,
+                              course_title: sess.course?.course_title,
+                            });
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-purple-50 text-purple-900 hover:bg-purple-100 text-xs font-bold border border-purple-200 transition-colors cursor-pointer"
+                          title="View all students who clocked in for this course"
+                        >
+                          <Users className="w-3.5 h-3.5 text-purple-700" />
+                          <span>Course Students</span>
+                        </button>
                         <Link
                           href={`/lecturer/sessions/${sess.id}`}
                           className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-bold transition-colors"
@@ -547,6 +578,19 @@ export default function LecturerHistoryPage() {
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  onClick={() => {
+                    if (activeSessionModal?.course) {
+                      setCourseModalCourse(activeSessionModal.course);
+                      setActiveSessionModal(null);
+                    }
+                  }}
+                  className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-fuoye-green border border-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="View all students who clocked in for this course across all sessions"
+                >
+                  <BookOpen className="w-3.5 h-3.5 text-fuoye-green" />
+                  <span>View Entire Course Clock-Ins</span>
+                </button>
                 <button
                   onClick={() => exportSessionToExcel(activeSessionModal, modalFilteredRecords)}
                   className="px-3.5 py-2 rounded-xl bg-fuoye-green text-white text-xs font-bold hover:bg-fuoye-green-dark flex items-center gap-1.5 shadow-sm transition-colors"
@@ -653,6 +697,17 @@ export default function LecturerHistoryPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Course Attendance Roster Modal */}
+      {courseModalCourse && (
+        <CourseAttendanceModal
+          isOpen={true}
+          onClose={() => setCourseModalCourse(null)}
+          courseId={courseModalCourse.id}
+          courseCode={courseModalCourse.course_code}
+          courseTitle={courseModalCourse.course_title}
+        />
       )}
     </div>
   );
